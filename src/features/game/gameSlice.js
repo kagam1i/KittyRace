@@ -5,6 +5,8 @@ import { createSlice } from '@reduxjs/toolkit';
 // начальное состояние игры
 const initialState = {
     status: 'menu', // menu|running|paused
+    laneIndex: 2, // текущая полоса 0|1|2|3|4
+    actionState: 'run', // run|jump|slide
 };
 
 // создание слайса для управления состоянием игры
@@ -24,11 +26,42 @@ const gameSlice = createSlice({
         goToGameMenu: (state) => {
             state.status = 'menu';
         },
+        moveLeft(state) {
+            // если мы не в самой левой полосе
+            if (state.laneIndex > 0) {
+                state.laneIndex -= 1;
+            }
+        },
+
+        moveRight(state) {
+            // если мы не в самой правой полосе
+            if (state.laneIndex < 4) {
+                state.laneIndex += 1;
+            }
+        },
+        setRun(state) {
+            state.actionState = 'run';
+        },
+        setJump(state) {
+            state.actionState = 'jump';
+        },
+        setSlide(state) {
+            state.actionState = 'slide';
+        },
     },
 });
 
 
-export const { startGame, pauseGame, resumeGame, goToGameMenu} = gameSlice.actions;
+export const {
+    startGame,
+    pauseGame,
+    resumeGame,
+    goToGameMenu,
+    moveLeft,
+    moveRight,
+    setRun,
+    setJump,
+    setSlide } = gameSlice.actions;
 
 export default gameSlice.reducer;
 
