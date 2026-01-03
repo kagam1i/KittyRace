@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { font-family: theme('fontFamily.sans'); }
+  body { @apply bg-bg text-text; }
+}
+
+@layer components {
+  .ui-panel {
+    @apply rounded-2xl border border-border bg-surface/90 backdrop-blur
+           shadow-soft;
+  }
+
+  .ui-title {
+    @apply font-heading text-3xl text-text;
+  }
+
+  .ui-btn {
+    @apply inline-flex items-center justify-center rounded-xl
+           px-4 py-2 font-semibold transition active:translate-y-[1px]
+           border border-border;
+  }
+
+  .ui-btn-primary {
+    @apply ui-btn bg-green text-text hover:opacity-90;
+  }
+
+  .ui-btn-accent {
+    @apply ui-btn bg-pink text-text hover:opacity-90;
+  }
+
+  .ui-btn-ghost {
+    @apply ui-btn bg-surface hover:bg-beige/60;
+  }
+
+  .ui-chip {
+    @apply rounded-xl border border-border bg-beige/60 px-3 py-2;
+  }
+}
