@@ -7,6 +7,7 @@ const initialState = {
     status: 'menu', // menu|running|paused
     laneIndex: 2, // текущая полоса 0|1|2|3|4
     actionState: 'run', // run|jump|slide
+    selectedCatId: "milo", // milo|bruno|luna
 };
 
 // создание слайса для управления состоянием игры
@@ -48,6 +49,10 @@ const gameSlice = createSlice({
         setSlide(state) {
             state.actionState = 'slide';
         },
+        selectCat(state, action) {
+            // action.payload — это строка, например "luna"
+            state.selectedCatId = action.payload;
+        },
     },
 });
 
@@ -61,7 +66,8 @@ export const {
     moveRight,
     setRun,
     setJump,
-    setSlide } = gameSlice.actions;
+    setSlide,
+    selectCat } = gameSlice.actions;
 
 export default gameSlice.reducer;
 
