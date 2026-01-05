@@ -49,6 +49,13 @@ export function MainMenu() {
             </button>
           ))}
         </div>
+
+
+        {/* проверка */}
+        {/* <div className="text-xs opacity-60 mt-2">
+          selectedCatId: {selectedCatId}
+        </div> */}
+
       </div>
     </div>
   );

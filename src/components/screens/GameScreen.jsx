@@ -1,12 +1,16 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { pauseGame, moveLeft, moveRight, setJump, setSlide, setRun } from "../../features/game/gameSlice";
+import CatSprite from "../game/CatSprite";
+
 
 
 export function GameScreen() {
   const dispatch = useDispatch();
   const laneIndex = useSelector((state) => state.game.laneIndex);
   const actionState = useSelector((state) => state.game.actionState);
+  const selectedCatId = useSelector((s) => s.game.selectedCatId);
+
 
 
   useEffect(() => {
@@ -89,24 +93,18 @@ export function GameScreen() {
             <div />
           </div>
 
-
-          {/* Котик-заглушка */}
+          {/* Котик*/}
           <div
             className="absolute transition-all duration-150"
             style={{
               left: `${laneIndex * 20 + 10}%`,
-              bottom:
-                actionState === "jump" ? "40%" : "24px",
+              bottom: actionState === "jump" ? "40%" : "24px",
               transform: "translateX(-50%)",
             }}
           >
-            <div
-              className={
-                "rounded-md bg-pink transition-all duration-150 " +
-                (actionState === "slide"
-                  ? "w-10 h-4"
-                  : "w-6 h-6")
-              }
+            <CatSprite
+              catId={selectedCatId}
+              actionState={actionState}
             />
           </div>
 
@@ -114,12 +112,6 @@ export function GameScreen() {
           {/* Плейсхолдер центра */}
           <div className="absolute inset-0 grid place-items-center">
             <div className="text-center opacity-60">
-              <div className="font-heading text-lg">
-                игровое поле
-              </div>
-              <div className="text-sm">
-                5 полос движения
-              </div>
             </div>
           </div>
 
