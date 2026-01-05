@@ -5,7 +5,7 @@ export default {
     extend: {
       colors: {
         // Фон страницы 
-        bg: "#F6F1E3",
+        bg: "#47BFDF",
 
         // Поверхности/панели 
         surface: "#FFF8EC",

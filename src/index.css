@@ -52,22 +52,89 @@
 
   /* -------------------- Title ------------------- */
   .ui-title {
-    @apply text-4xl uppercase tracking-wide;
+    font-size: 32px;
     line-height: 1;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 
-    color: #2f3e36; /* тёплый тёмно-зелёный */
+    color: #2f3e36;
+
     text-shadow:
-      1px 1px 0 rgba(255, 255, 255, 0.6),
-      2px 2px 0 rgba(0, 0, 0, 0.18);
+      1px 1px 0 rgba(255, 255, 255, 0.65),
+      2px 2px 0 rgba(47, 62, 54, 0.25);
+  }
+
+  /* ============================== NEW: мягкое появление элементов (MainMenu) ============================== */
+  @keyframes uiFadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .ui-fade-in {
+    opacity: 0;
+    animation: uiFadeUp 750ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  .ui-delay-1 {
+    animation-delay: 120ms;
+  }
+
+  .ui-delay-2 {
+    animation-delay: 520ms;
+  }
+
+  .ui-delay-3 {
+    animation-delay: 980ms;
+  }
+
+  .ui-delay-4 {
+    animation-delay: 1260ms;
+  }
+
+  /* ============================== NEW: облачный параллакс (верхняя часть фона) ============================== */
+  /* Мы не двигаем весь фон (чтобы не “плыли” деревья), а делаем отдельный слой,
+     который показывает только верх (небо+облака) и медленно дрейфует по X. */
+  @keyframes cloudDrift {
+    from {
+      transform: translateX(0);
+    }
+
+    to {
+      transform: translateX(18px);
+    }
+
+    /* небольшое смещение, чтобы было очень нежно */
+  }
+
+  .ui-menu-clouds {
+    position: absolute;
+    inset: 0;
+
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center;
+
+    /* показываем только верх фона (где облака) */
+    clip-path: inset(0 0 58% 0);
+
+    /* лёгкая “вуаль” на слой облаков, чтобы дрейф был мягче */
+    opacity: 0.85;
+
+    animation: cloudDrift 9s ease-in-out infinite alternate;
+    will-change: transform;
   }
 
   /* ============================== BUTTONS ====================================== */
 
   .ui-btn {
-    @apply inline-flex items-center justify-center select-none
-           px-5 py-2
-           uppercase
-           transition-transform;
+    @apply inline-flex items-center justify-center select-none px-5 py-2 uppercase transition-transform;
 
     font-size: 14px;
     letter-spacing: 0.06em;
@@ -76,11 +143,9 @@
     border: 1px solid var(--ui-stroke);
 
     background:
-      linear-gradient(
-        to bottom,
-        rgba(255,255,255,0.35),
-        rgba(255,255,255,0.0)
-      ),
+      linear-gradient(to bottom,
+        rgba(255, 255, 255, 0.35),
+        rgba(255, 255, 255, 0.0)),
       theme('colors.surface');
 
     box-shadow:
@@ -103,7 +168,7 @@
     box-shadow:
       0 0 0 1px rgba(40, 55, 45, 0.10),
       0 2px 0 var(--ui-shadow-press),
-      inset 0 1px 0 rgba(255,255,255,0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
       inset 0 -1px 0 rgba(18, 28, 24, 0.10);
   }
 
@@ -120,17 +185,15 @@
     border-color: var(--ui-stroke-strong);
 
     background:
-      linear-gradient(
-        to bottom,
-        rgba(255,255,255,0.45),
-        rgba(255,255,255,0.05)
-      ),
+      linear-gradient(to bottom,
+        rgba(255, 255, 255, 0.45),
+        rgba(255, 255, 255, 0.05)),
       theme('colors.green');
 
     box-shadow:
       0 0 0 1px rgba(40, 55, 45, 0.10),
       0 3px 0 rgba(18, 28, 24, 0.14),
-      inset 0 1px 0 rgba(255,255,255,0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
       inset 0 -1px 0 rgba(18, 28, 24, 0.10);
   }
 
@@ -140,17 +203,15 @@
     border-color: var(--ui-stroke-strong);
 
     background:
-      linear-gradient(
-        to bottom,
-        rgba(255,255,255,0.45),
-        rgba(255,255,255,0.06)
-      ),
+      linear-gradient(to bottom,
+        rgba(255, 255, 255, 0.45),
+        rgba(255, 255, 255, 0.06)),
       theme('colors.pink');
 
     box-shadow:
       0 0 0 1px rgba(40, 55, 45, 0.10),
       0 3px 0 rgba(18, 28, 24, 0.12),
-      inset 0 1px 0 rgba(255,255,255,0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
       inset 0 -1px 0 rgba(18, 28, 24, 0.10);
   }
 
@@ -160,18 +221,37 @@
     border-color: rgba(70, 90, 80, 0.35);
 
     background:
-      linear-gradient(
-        to bottom,
-        rgba(255,255,255,0.45),
-        rgba(255,255,255,0.10)
-      ),
+      linear-gradient(to bottom,
+        rgba(255, 255, 255, 0.45),
+        rgba(255, 255, 255, 0.10)),
       rgba(255, 255, 255, 0.50);
 
     box-shadow:
       0 0 0 1px rgba(40, 55, 45, 0.08),
       0 3px 0 rgba(18, 28, 24, 0.10),
-      inset 0 1px 0 rgba(255,255,255,0.65),
+      inset 0 1px 0 rgba(255, 255, 255, 0.65),
       inset 0 -1px 0 rgba(18, 28, 24, 0.06);
+  }
+
+  /* Специальная кнопка под иконку (чтобы она читалась на фоне) */
+  .ui-icon-btn {
+    @apply ui-btn-ghost grid place-items-center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+
+    background:
+      linear-gradient(to bottom,
+        rgba(255, 255, 255, 0.70),
+        rgba(255, 255, 255, 0.20)),
+      rgba(255, 255, 255, 0.75);
+
+    border-color: rgba(47, 58, 46, 0.28);
+
+    box-shadow:
+      0 0 0 1px rgba(40, 55, 45, 0.10),
+      0 3px 0 rgba(18, 28, 24, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.75);
   }
 
   /* -------------------- Chip --------------------------- */
@@ -185,19 +265,16 @@
     border: 1px solid rgba(70, 90, 80, 0.30);
 
     background:
-      linear-gradient(
-        to bottom,
-        rgba(255,255,255,0.35),
-        rgba(255,255,255,0.0)
-      ),
+      linear-gradient(to bottom,
+        rgba(255, 255, 255, 0.35),
+        rgba(255, 255, 255, 0.0)),
       theme('colors.beige');
 
     box-shadow:
       0 0 0 1px rgba(40, 55, 45, 0.08),
       0 2px 0 rgba(18, 28, 24, 0.08),
-      inset 0 1px 0 rgba(255,255,255,0.55);
+      inset 0 1px 0 rgba(255, 255, 255, 0.55);
   }
-
 
   /* -------------------- HUD --------------------------- */
 
@@ -210,11 +287,9 @@
     border-radius: 0;
 
     background:
-      linear-gradient(
-        to bottom,
-        rgba(255,255,255,0.55),
-        rgba(255,255,255,0.15)
-      ),
+      linear-gradient(to bottom,
+        rgba(255, 255, 255, 0.55),
+        rgba(255, 255, 255, 0.15)),
       theme('colors.beige');
 
     border: 1px solid rgba(70, 90, 80, 0.30);
@@ -222,7 +297,7 @@
     box-shadow:
       0 0 0 1px rgba(40, 55, 45, 0.08),
       0 2px 0 rgba(18, 28, 24, 0.08),
-      inset 0 1px 0 rgba(255,255,255,0.55);
+      inset 0 1px 0 rgba(255, 255, 255, 0.55);
   }
 
   .ui-hud-btn {
@@ -237,19 +312,17 @@
     border-radius: 0;
 
     background:
-      linear-gradient(
-        to bottom,
-        rgba(255,255,255,0.40),
-        rgba(255,255,255,0.00)
-      ),
-      #f2d4a6; 
+      linear-gradient(to bottom,
+        rgba(255, 255, 255, 0.40),
+        rgba(255, 255, 255, 0.00)),
+      #f2d4a6;
 
     border: 1px solid rgba(120, 92, 64, 0.55);
 
     box-shadow:
       0 0 0 1px rgba(120, 92, 64, 0.35),
       0 10px 0 rgba(40, 55, 45, 0.10),
-      inset 0 1px 0 rgba(255,255,255,0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
       inset 0 -1px 0 rgba(120, 92, 64, 0.18);
   }
 
@@ -261,7 +334,111 @@
     color: rgba(56, 46, 34, 0.92);
 
     text-shadow:
-      1px 1px 0 rgba(255,255,255,0.55),
-      2px 2px 0 rgba(0,0,0,0.14);
+      1px 1px 0 rgba(255, 255, 255, 0.55),
+      2px 2px 0 rgba(0, 0, 0, 0.14);
+  }
+
+  /* ================ Cat Select Card ====================== */
+
+  .ui-cat-card {
+    width: 128px;
+    padding: 28px 12px 12px;
+    border-radius: 0;
+
+    border: 1px solid rgba(70, 90, 80, 0.35);
+    background:
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.10)),
+      rgba(255, 255, 255, 0.55);
+
+    box-shadow:
+      0 0 0 1px rgba(40, 55, 45, 0.08),
+      0 3px 0 rgba(40, 55, 45, 0.10),
+      inset 0 1px 0 rgba(255, 255, 255, 0.55);
+
+    display: grid;
+    place-items: center;
+    gap: 10px;
+
+    transition: transform 120ms ease, filter 120ms ease, box-shadow 120ms ease;
+
+    position: relative;
+  }
+
+  .ui-cat-card:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.02);
+  }
+
+  .ui-cat-card:active {
+    transform: translateY(1px);
+    box-shadow:
+      0 0 0 1px rgba(40, 55, 45, 0.08),
+      0 2px 0 rgba(40, 55, 45, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  }
+
+  /* выбранная карточка */
+  .ui-cat-card.is-active {
+    background:
+      linear-gradient(to bottom,
+        rgba(255, 255, 255, 0.70),
+        rgba(255, 255, 255, 0.15)),
+      rgba(232, 211, 168, 0.65);
+
+    border-color: rgba(70, 90, 80, 0.35);
+
+    box-shadow:
+      0 0 0 1px rgba(40, 55, 45, 0.08),
+      0 4px 0 rgba(40, 55, 45, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.60);
+  }
+
+  /* бейдж выбранного кота */
+  .ui-cat-card__badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+
+    padding: 4px 6px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+
+    border: 1px solid rgba(120, 92, 64, 0.55);
+    background:
+      linear-gradient(to bottom,
+        rgba(255, 255, 255, 0.55),
+        rgba(255, 255, 255, 0.10)),
+      #f2d4a6;
+
+    color: rgba(56, 46, 34, 0.92);
+
+    box-shadow:
+      0 0 0 1px rgba(120, 92, 64, 0.20),
+      0 2px 0 rgba(40, 55, 45, 0.10);
+
+    pointer-events: none;
+  }
+
+  .ui-cat-card__img {
+    width: 72px;
+    height: 72px;
+
+    background-repeat: no-repeat;
+
+    background-size: 70px 70px;
+
+    background-position: calc(50% - 2px) bottom;
+
+    image-rendering: pixelated;
+  }
+
+  .ui-cat-card__label {
+    font-size: 16px;
+    line-height: 1;
+    letter-spacing: 0.06em;
+
+    text-transform: lowercase;
+    color: rgba(47, 58, 46, 0.95);
   }
 }

@@ -14,6 +14,8 @@ import {
 import CatSprite from "../game/CatSprite";
 import { PLAYER_RENDER } from "../../config/playerRender";
 
+import fishIcon from "../../assets/environment/fish.png";
+
 export function GameScreen() {
   const dispatch = useDispatch();
 
@@ -120,9 +122,16 @@ export function GameScreen() {
       {/* Обёртка нужна, чтобы привязать HUD к полю, но держать его СНАРУЖИ */}
       <div className="relative w-[min(520px,92vw)]">
         {/* HUD “приклеен” к верхней грани поля, но находится СНАРУЖИ */}
-        {/* top-[-52px] — поднимаем HUD над квадратом (можешь подстроить) */}
         <div className="absolute top-[-52px] left-0 right-0 flex items-center justify-between">
-          <div className="ui-hud">счёт монеток: 0</div>
+          <div className="ui-hud flex items-center gap-2">
+            <img
+              src={fishIcon}
+              alt="fish"
+              className="w-8 h-8"
+              style={{ imageRendering: "pixelated" }}
+            />
+            <span>0</span>
+          </div>
 
           <button className="ui-hud-btn" onClick={() => dispatch(pauseGame())}>
             menu
