@@ -4,7 +4,7 @@ import { createSlice } from '@reduxjs/toolkit';
 
 // начальное состояние игры
 const initialState = {
-    status: 'menu', // menu|running|paused
+    status: 'menu', // menu|running|paused|gameover
     laneIndex: 2, // текущая полоса 0|1|2|3|4
     actionState: 'run', // run|jump|slide
     selectedCatId: "milo", // milo|bruno|luna
@@ -26,6 +26,9 @@ const gameSlice = createSlice({
         },
         goToGameMenu: (state) => {
             state.status = 'menu';
+        },
+        gameOver(state) {
+            state.status = "gameover";
         },
         moveLeft(state) {
             // если мы не в самой левой полосе

@@ -6,19 +6,17 @@ import { useSelector } from 'react-redux'
 import {MainMenu} from '../components/screens/MainMenu'
 import {GameScreen} from '../components/screens/GameScreen'
 import {PauseMenu} from '../components/screens/PauseMenu'
+import {GameOverMenu} from '../components/screens/GameOverMenu';
 
 export const GameRoot = () => {
     // получение текущего статуса игры из глобального состояния
     const gameStatus = useSelector((state) => state.game.status);   
 
     // рендеринг соответствующего экрана в зависимости от статуса игры
-    if (gameStatus === 'menu') {
-        return <MainMenu />;
-    }
+  if (gameStatus === "menu") return <MainMenu />;
+  if (gameStatus === "paused") return <PauseMenu />;
+  if (gameStatus === "gameover") return <GameOverMenu />;
 
-    if (gameStatus === 'paused') {
-        return <PauseMenu />;
-    }
 
     return <GameScreen />;
 };

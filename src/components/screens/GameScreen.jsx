@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
-// Экшены из gameSlice 
+// Экшены из gameSlice
 import {
   pauseGame,
   moveLeft,
@@ -115,37 +115,39 @@ export function GameScreen() {
   }, [dispatch]);
 
   return (
-    <div className="min-h-screen bg-bg p-6">
-      {/* Верхний HUD */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="ui-chip">счёт монеток: 0</div>
+    // Важно: центрируем ВСЁ по вертикали и горизонтали
+    <div className="min-h-screen bg-bg grid place-items-center">
+      {/* Обёртка нужна, чтобы привязать HUD к полю, но держать его СНАРУЖИ */}
+      <div className="relative w-[min(520px,92vw)]">
+        {/* HUD “приклеен” к верхней грани поля, но находится СНАРУЖИ */}
+        {/* top-[-52px] — поднимаем HUD над квадратом (можешь подстроить) */}
+        <div className="absolute top-[-52px] left-0 right-0 flex items-center justify-between">
+          <div className="ui-hud">счёт монеток: 0</div>
 
-        {/* Кнопка паузы */}
-        <button className="ui-btn-ghost" onClick={() => dispatch(pauseGame())}>
-          menu
-        </button>
-      </div>
+          <button className="ui-hud-btn" onClick={() => dispatch(pauseGame())}>
+            menu
+          </button>
+        </div>
 
-      {/* Игровое поле */}
-      <div className="grid place-items-center">
+        {/* Игровое поле */}
         <div
           className="
             relative
-            w-[min(520px,92vw)]
+            w-full
             aspect-square
-            rounded-[36px]
+            rounded-none
             bg-surface
             border border-border
             shadow-soft
             overflow-hidden
           "
         >
-          {/* Сетка из 5 полос (визуальная, пока без логики коллизий) */}
+          {/* Сетка из 5 полос */}
           <div className="absolute inset-0 grid grid-cols-5">
-            <div className="border-r border-border/40" />
-            <div className="border-r border-border/40" />
-            <div className="border-r border-border/40" />
-            <div className="border-r border-border/40" />
+            <div className="border-r border-border/20" />
+            <div className="border-r border-border/20" />
+            <div className="border-r border-border/20" />
+            <div className="border-r border-border/20" />
             <div />
           </div>
 

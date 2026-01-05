@@ -4,27 +4,40 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Kawaii Forest palette
-        bg: "#F7FFF4",
-        surface: "#FFFFFF",
-        text: "#1B2A2A",
+        // Фон страницы 
+        bg: "#F6F1E3",
 
-        green: "#34D399", // primary
-        pink: "#FF7AB6",  // accent
-        beige: "#F6E6C9", // support
-        brown: "#6B4E3D", // shadow / dirt hint
+        // Поверхности/панели 
+        surface: "#FFF8EC",
 
-        border: "rgba(27, 42, 42, 0.14)",
+        // Основной текст 
+        text: "#2F3A2E",
+
+        // Основной зелёный 
+        green: "#6FAF4B",
+
+        // Акцент 
+        pink: "#D96B8A",
+
+        // Вспомогательный тёплый беж 
+        beige: "#E8D3A8",
+
+        // Коричневый 
+        brown: "#7A5A3A",
+
+        // Бордер 
+        border: "rgba(47, 58, 46, 0.16)",
       },
+
       fontFamily: {
-        heading: ["Fredoka", "system-ui", "sans-serif"],
-        sans: ["Nunito", "system-ui", "sans-serif"],
+        pixel: ["Pixelify Sans", "system-ui", "sans-serif"],
+        sans: ["Pixelify Sans", "system-ui", "sans-serif"],
+        heading: ["Pixelify Sans", "system-ui", "sans-serif"],
       },
-      borderRadius: {
-        xl2: "1.25rem", // чуть милее стандартного
-      },
+
       boxShadow: {
-        soft: "0 10px 30px rgba(107, 78, 61, 0.12)",
+        // Мягкая тень в “земляном” стиле 
+        soft: "0 12px 30px rgba(122, 90, 58, 0.14)",
       },
     },
   },

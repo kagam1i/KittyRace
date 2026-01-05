@@ -6,8 +6,10 @@ export function PauseMenu() {
 
   return (
     <div className="min-h-screen grid place-items-center p-6 bg-bg">
-      <div className="ui-panel w-[min(520px,92vw)] p-6">
-        <h1 className="ui-title text-center">Kitty race</h1>
+      {/* ui-board — “табличка” в стиле Stardew */}
+      <div className="ui-board w-[min(520px,92vw)] p-6">
+        {/* ui-board-title — заголовок на табличке */}
+        <h1 className="ui-board-title">Kitty race</h1>
 
         <div className="mt-10 grid gap-4 place-items-center">
           <button

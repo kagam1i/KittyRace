@@ -2,48 +2,266 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ========================== BASE ================================= */
 @layer base {
   html {
-    font-family: theme('fontFamily.sans');
+    font-family: theme('fontFamily.pixel');
   }
 
   body {
     @apply bg-bg text-text;
   }
 
-  /* Pixel-art helpers */
   .pixelated {
     image-rendering: pixelated;
     image-rendering: crisp-edges;
   }
 }
 
+/* ========================= UTILITIES ===================================== */
+@layer utilities {
+  .pixel-title-depth {
+    text-shadow:
+      1px 1px 0 rgba(255, 255, 255, 0.55),
+      2px 2px 0 rgba(0, 0, 0, 0.18);
+  }
+}
+
+/* ================== COMPONENTS — Cozy Pixel UI =========================== */
 @layer components {
-  .ui-panel {
-    @apply rounded-[36px] border border-border bg-surface/90 backdrop-blur shadow-soft;
+  :root {
+    --ui-stroke: rgba(70, 90, 80, 0.35);
+    --ui-stroke-strong: rgba(70, 90, 80, 0.45);
+
+    --ui-shadow: rgba(40, 55, 45, 0.12);
+    --ui-shadow-press: rgba(40, 55, 45, 0.10);
+
+    --ui-highlight: rgba(255, 255, 255, 0.55);
+    --ui-highlight-soft: rgba(255, 255, 255, 0.28);
   }
 
-  .ui-title {
-    @apply font-heading text-3xl text-text;
+  /* -------------------- Panel --------------------------- */
+  .ui-panel {
+    @apply bg-surface border border-border;
+    border-radius: 0;
+
+    box-shadow:
+      0 0 0 1px rgba(40, 55, 45, 0.10),
+      0 8px 0 rgba(18, 28, 24, 0.08);
   }
+
+  /* -------------------- Title ------------------- */
+  .ui-title {
+    @apply text-4xl uppercase tracking-wide;
+    line-height: 1;
+
+    color: #2f3e36; /* тёплый тёмно-зелёный */
+    text-shadow:
+      1px 1px 0 rgba(255, 255, 255, 0.6),
+      2px 2px 0 rgba(0, 0, 0, 0.18);
+  }
+
+  /* ============================== BUTTONS ====================================== */
 
   .ui-btn {
-    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 font-semibold border border-border transition active:translate-y-[1px];
+    @apply inline-flex items-center justify-center select-none
+           px-5 py-2
+           uppercase
+           transition-transform;
+
+    font-size: 14px;
+    letter-spacing: 0.06em;
+
+    border-radius: 0;
+    border: 1px solid var(--ui-stroke);
+
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.35),
+        rgba(255,255,255,0.0)
+      ),
+      theme('colors.surface');
+
+    box-shadow:
+      0 0 0 1px rgba(40, 55, 45, 0.10),
+      0 3px 0 var(--ui-shadow),
+      inset 0 1px 0 var(--ui-highlight),
+      inset 1px 0 0 var(--ui-highlight-soft),
+      inset 0 -1px 0 rgba(18, 28, 24, 0.08),
+      inset -1px 0 0 rgba(18, 28, 24, 0.06);
   }
 
+  .ui-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.02);
+  }
+
+  .ui-btn:active {
+    transform: translateY(1px);
+
+    box-shadow:
+      0 0 0 1px rgba(40, 55, 45, 0.10),
+      0 2px 0 var(--ui-shadow-press),
+      inset 0 1px 0 rgba(255,255,255,0.35),
+      inset 0 -1px 0 rgba(18, 28, 24, 0.10);
+  }
+
+  .ui-btn:focus-visible {
+    outline: 2px solid rgba(255, 121, 179, 0.55);
+    outline-offset: 3px;
+  }
+
+  /* ---------- Button variants ---------- */
+
   .ui-btn-primary {
-    @apply ui-btn bg-green text-text hover:opacity-90;
+    @apply ui-btn;
+
+    border-color: var(--ui-stroke-strong);
+
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.45),
+        rgba(255,255,255,0.05)
+      ),
+      theme('colors.green');
+
+    box-shadow:
+      0 0 0 1px rgba(40, 55, 45, 0.10),
+      0 3px 0 rgba(18, 28, 24, 0.14),
+      inset 0 1px 0 rgba(255,255,255,0.55),
+      inset 0 -1px 0 rgba(18, 28, 24, 0.10);
   }
 
   .ui-btn-accent {
-    @apply ui-btn bg-pink text-text hover:opacity-90;
+    @apply ui-btn;
+
+    border-color: var(--ui-stroke-strong);
+
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.45),
+        rgba(255,255,255,0.06)
+      ),
+      theme('colors.pink');
+
+    box-shadow:
+      0 0 0 1px rgba(40, 55, 45, 0.10),
+      0 3px 0 rgba(18, 28, 24, 0.12),
+      inset 0 1px 0 rgba(255,255,255,0.55),
+      inset 0 -1px 0 rgba(18, 28, 24, 0.10);
   }
 
   .ui-btn-ghost {
-    @apply ui-btn bg-surface hover:bg-beige/60;
+    @apply ui-btn;
+
+    border-color: rgba(70, 90, 80, 0.35);
+
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.45),
+        rgba(255,255,255,0.10)
+      ),
+      rgba(255, 255, 255, 0.50);
+
+    box-shadow:
+      0 0 0 1px rgba(40, 55, 45, 0.08),
+      0 3px 0 rgba(18, 28, 24, 0.10),
+      inset 0 1px 0 rgba(255,255,255,0.65),
+      inset 0 -1px 0 rgba(18, 28, 24, 0.06);
   }
 
+  /* -------------------- Chip --------------------------- */
   .ui-chip {
-    @apply rounded-xl border border-border bg-beige/60 px-3 py-2;
+    @apply px-3 py-2 uppercase;
+    border-radius: 0;
+
+    font-size: 13px;
+    letter-spacing: 0.05em;
+
+    border: 1px solid rgba(70, 90, 80, 0.30);
+
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.35),
+        rgba(255,255,255,0.0)
+      ),
+      theme('colors.beige');
+
+    box-shadow:
+      0 0 0 1px rgba(40, 55, 45, 0.08),
+      0 2px 0 rgba(18, 28, 24, 0.08),
+      inset 0 1px 0 rgba(255,255,255,0.55);
+  }
+
+
+  /* -------------------- HUD --------------------------- */
+
+  .ui-hud {
+    @apply uppercase;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+
+    padding: 8px 10px;
+    border-radius: 0;
+
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.55),
+        rgba(255,255,255,0.15)
+      ),
+      theme('colors.beige');
+
+    border: 1px solid rgba(70, 90, 80, 0.30);
+
+    box-shadow:
+      0 0 0 1px rgba(40, 55, 45, 0.08),
+      0 2px 0 rgba(18, 28, 24, 0.08),
+      inset 0 1px 0 rgba(255,255,255,0.55);
+  }
+
+  .ui-hud-btn {
+    @apply ui-btn-ghost;
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+
+  /* =========================== Pause/GameOver панель как “табличка” ============================= */
+
+  .ui-board {
+    border-radius: 0;
+
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.40),
+        rgba(255,255,255,0.00)
+      ),
+      #f2d4a6; 
+
+    border: 1px solid rgba(120, 92, 64, 0.55);
+
+    box-shadow:
+      0 0 0 1px rgba(120, 92, 64, 0.35),
+      0 10px 0 rgba(40, 55, 45, 0.10),
+      inset 0 1px 0 rgba(255,255,255,0.55),
+      inset 0 -1px 0 rgba(120, 92, 64, 0.18);
+  }
+
+  .ui-board-title {
+    @apply uppercase tracking-wide text-center;
+    font-size: 28px;
+    line-height: 1;
+
+    color: rgba(56, 46, 34, 0.92);
+
+    text-shadow:
+      1px 1px 0 rgba(255,255,255,0.55),
+      2px 2px 0 rgba(0,0,0,0.14);
   }
 }
