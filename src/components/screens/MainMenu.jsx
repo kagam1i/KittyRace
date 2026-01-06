@@ -39,7 +39,7 @@ export function MainMenu() {
           imageRendering: "pixelated",
         }}
       >
-        {/* облачный параллакс (очень лёгкий) */}
+        {/* облачный параллакс */}
         <div
           className="ui-menu-clouds pointer-events-none"
           style={{ backgroundImage: `url(${backgroundImg})` }}

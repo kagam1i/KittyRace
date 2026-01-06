@@ -25,6 +25,22 @@
       1px 1px 0 rgba(255, 255, 255, 0.55),
       2px 2px 0 rgba(0, 0, 0, 0.18);
   }
+
+    @keyframes fishPop {
+    0% {
+      transform: translate(-50%, -50%) scale(1);
+    }
+    50% {
+      transform: translate(-50%, -50%) scale(1.15);
+    }
+    100% {
+      transform: translate(-50%, -50%) scale(1);
+    }
+  }
+
+  .fish-pop {
+    animation: fishPop 120ms ease-out;
+  }
 }
 
 /* ================== COMPONENTS — Cozy Pixel UI =========================== */
@@ -301,10 +317,26 @@
   }
 
   .ui-hud-btn {
-    @apply ui-btn-ghost;
-    font-size: 12px;
-    padding: 8px 10px;
+    /* Делаем кнопку МЕНЮ визуально частью HUD (та же "табличка"),
+     а не отдельной "кнопкой-ghost". Так выглядит гармоничнее. */
+    @apply ui-hud inline-flex items-center justify-center select-none;
+
+    /* HUD уже задаёт font-size, padding и фон.
+     Добавляем только ощущения "кнопки": */
+    cursor: pointer;
+    transition: transform 120ms ease, filter 120ms ease;
   }
+
+  .ui-hud-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.03);
+  }
+
+  .ui-hud-btn:active {
+    transform: translateY(1px);
+    filter: brightness(0.98);
+  }
+
 
   /* =========================== Pause/GameOver панель как “табличка” ============================= */
 

@@ -1,184 +1,130 @@
-import { useEffect, useRef } from "react";
+// GameScreen — экран "running":
+// 1) Рисуем квадратное игровое поле
+// 2) Слои внутри дороги:
+//    - TrackRoad (фон дороги)
+//    - ObstacleLayer (препятствия)
+//    - FishLayer (рыбки, которые можно собирать)
+//    - LaneGrid (тонкие линии полос — чисто визуально)
+//    - PlayerActor (котик)
+// 3) Слева/справа — TrackShoulder (обочины + декор внутри).
+//
+// Важно про паузу:
+// - На pause/resume мы НЕ должны перемонтировать ObstacleLayer/FishLayer,
+//   иначе их внутреннее состояние (refs) сбросится и игра "начнётся заново".
+// - Поэтому тут НЕТ key={runId} на слоях.
+// - Полный рестарт делается через runId внутри слоёв (ObstacleLayer смотрит runId и чистит refs сам).
+
 import { useDispatch, useSelector } from "react-redux";
+import { useRef } from "react";
 
-// Экшены из gameSlice
-import {
-  pauseGame,
-  moveLeft,
-  moveRight,
-  setJump,
-  setSlide,
-  setRun,
-} from "../../features/game/gameSlice";
+import { TrackRoad } from "../game/TrackRoad";
+import { TrackShoulder } from "../game/TrackShoulders";
+import ObstacleLayer from "../game/obstacles/ObstacleLayer";
+import FishLayer from "../game/pickups/FishLayer";
 
-import CatSprite from "../game/CatSprite";
-import { PLAYER_RENDER } from "../../config/playerRender";
+import { pauseGame } from "../../features/game/gameSlice";
 
-import fishIcon from "../../assets/environment/fish.png";
+import { SHOULDER_STRIP_PERCENT } from "../../config/trackRoad";
+
+import { useSquareFieldSize } from "./gameScreen/useSquareFieldSize";
+import { useGameControls } from "./gameScreen/useGameControls";
+import GameHud from "./gameScreen/GameHud";
+import LaneGrid from "./gameScreen/LaneGrid";
+import PlayerActor from "./gameScreen/PlayerActor";
 
 export function GameScreen() {
   const dispatch = useDispatch();
 
-  // laneIndex — текущая полоса (0..4)
+  // Глобальное состояние (Redux)
   const laneIndex = useSelector((state) => state.game.laneIndex);
-
-  // actionState — текущее действие кота (run/jump/slide)
   const actionState = useSelector((state) => state.game.actionState);
+  const selectedCatId = useSelector((state) => state.game.selectedCatId);
 
-  // selectedCatId — выбранный кот в меню (milo/bruno/luna)
-  const selectedCatId = useSelector((s) => s.game.selectedCatId);
+  // runId увеличивается только на новый забег (start/restart),
+  // а на pause/resume НЕ должен меняться.
+  // Он нужен, чтобы слои (ObstacleLayer/FishLayer) понимали,
+  // что началась новая попытка и можно очистить внутренние refs.
+  const runId = useSelector((s) => s.game.runId);
 
-  // actionStateRef  - позволяет обработчику клавиш видеть актуальное состояние
-  const actionStateRef = useRef(actionState);
+  // ✅ FishLayer должен знать про текущие препятствия (чтобы не класть рыбу на avoidLane)
+  // Мы не тащим это в Redux, а просто храним "геттер" в ref.
+  const obstaclesGetterRef = useRef(() => []);
 
-  // actionTimeoutRef хранит id таймера возврата в run (после jump/slide).
-  const actionTimeoutRef = useRef(null);
+  // Управление (стрелки/wasd + jump/slide + pause)
+  useGameControls();
 
-  // Каждый раз, когда actionState меняется в Redux, обновляем ref, чтобы handleKeyDown видел актуальное состояние
-  useEffect(() => {
-    actionStateRef.current = actionState;
-  }, [actionState]);
+  // Размер игрового поля
+  const { fieldRef, fieldPx } = useSquareFieldSize();
 
-  // Обработчик клавиш для управления игрой
-  useEffect(() => {
-    // отмена текущего таймера возврата в run
-    function clearActionTimeout() {
-      if (actionTimeoutRef.current) {
-        clearTimeout(actionTimeoutRef.current);
-        actionTimeoutRef.current = null;
-      }
-    }
-
-    function handleKeyDown(e) {
-      const key = e.key;
-
-      if (key === "ArrowLeft" || key === "a" || key === "ф") {
-        dispatch(moveLeft());
-        return;
-      }
-
-      if (key === "ArrowRight" || key === "d" || key === "в") {
-        dispatch(moveRight());
-        return;
-      }
-
-      if (key === "Escape") {
-        dispatch(pauseGame());
-        return;
-      }
-
-      const isJumpKey = key === "ArrowUp" || key === "w" || key === "ц";
-      const isSlideKey = key === "ArrowDown" || key === "s" || key === "ы";
-
-      // забор актуального состояния из реф
-      const currentAction = actionStateRef.current;
-
-      // jump/slide запускается только если сейчас мы в run(чтобы не спамить)
-      if ((isJumpKey || isSlideKey) && currentAction !== "run") return;
-
-      // Прыжок
-      if (isJumpKey) {
-        clearActionTimeout();
-
-        dispatch(setJump());
-
-        actionTimeoutRef.current = setTimeout(() => {
-          dispatch(setRun());
-          actionTimeoutRef.current = null;
-        }, 450);
-
-        return;
-      }
-
-      // Слайд
-      if (isSlideKey) {
-        clearActionTimeout();
-        dispatch(setSlide());
-
-        actionTimeoutRef.current = setTimeout(() => {
-          dispatch(setRun());
-          actionTimeoutRef.current = null;
-        }, 500);
-
-        return;
-      }
-    }
-
-    // слушаем нажатия клавиш
-    window.addEventListener("keydown", handleKeyDown);
-
-    // очищаем обработчик и таймер при размонтировании
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-
-      // очищаем таймер возврата в run
-      if (actionTimeoutRef.current) clearTimeout(actionTimeoutRef.current);
-    };
-  }, [dispatch]);
+  // Размер центральной колонки дороги (76% ширины поля)
+  const roadW = Math.floor(fieldPx * (1 - (SHOULDER_STRIP_PERCENT * 2) / 100));
 
   return (
-    // Важно: центрируем ВСЁ по вертикали и горизонтали
     <div className="min-h-screen bg-bg grid place-items-center">
-      {/* Обёртка нужна, чтобы привязать HUD к полю, но держать его СНАРУЖИ */}
-      <div className="relative w-[min(520px,92vw)]">
-        {/* HUD “приклеен” к верхней грани поля, но находится СНАРУЖИ */}
-        <div className="absolute top-[-52px] left-0 right-0 flex items-center justify-between">
-          <div className="ui-hud flex items-center gap-2">
-            <img
-              src={fishIcon}
-              alt="fish"
-              className="w-8 h-8"
-              style={{ imageRendering: "pixelated" }}
-            />
-            <span>0</span>
-          </div>
-
-          <button className="ui-hud-btn" onClick={() => dispatch(pauseGame())}>
-            menu
-          </button>
-        </div>
+      {/* Обёртка, чтобы приклеить HUD к полю, но держать его снаружи */}
+      <div className="relative w-[min(640px,96vw)]">
+        <GameHud onMenuClick={() => dispatch(pauseGame())} />
 
         {/* Игровое поле */}
         <div
-          className="
-            relative
-            w-full
-            aspect-square
-            rounded-none
-            bg-surface
-            border border-border
-            shadow-soft
-            overflow-hidden
-          "
+          className="relative w-full aspect-square rounded-none bg-bg border border-border shadow-soft overflow-hidden"
+          ref={fieldRef}
         >
-          {/* Сетка из 5 полос */}
-          <div className="absolute inset-0 grid grid-cols-5">
-            <div className="border-r border-border/20" />
-            <div className="border-r border-border/20" />
-            <div className="border-r border-border/20" />
-            <div className="border-r border-border/20" />
-            <div />
-          </div>
-
-          {/* Котик */}
+          {/* Делим поле на 3 колонки: обочина | дорога (5 lanes) | обочина */}
           <div
-            className="absolute transition-all duration-150"
+            className="absolute inset-0 grid"
             style={{
-              left: `${laneIndex * 20 + 10}%`,
-              bottom:
-                actionState === "jump"
-                  ? `${PLAYER_RENDER.JUMP_BOTTOM_PERCENT}%`
-                  : `${PLAYER_RENDER.GROUND_BOTTOM_PX}px`,
-              transform: "translateX(-50%)",
+              gridTemplateColumns: `${SHOULDER_STRIP_PERCENT}% ${
+                100 - SHOULDER_STRIP_PERCENT * 2
+              }% ${SHOULDER_STRIP_PERCENT}%`,
             }}
           >
-            {/* Рендерим выбранного кота и передаём его состояние */}
-            <CatSprite catId={selectedCatId} actionState={actionState} />
-          </div>
+            {/* Левая обочина */}
+            <div className="relative overflow-hidden">
+              {fieldPx > 0 && <TrackShoulder fieldPx={fieldPx} side="left" />}
+            </div>
 
-          {/* Плейсхолдер центра */}
-          <div className="absolute inset-0 grid place-items-center">
-            <div className="text-center opacity-60"></div>
+            {/* Центр: дорога + полосы + препятствия + рыбы + кот */}
+            <div className="relative overflow-hidden">
+              {fieldPx > 0 && <TrackRoad fieldPx={roadW} />}
+
+              {/* Препятствия — едут той же скоростью, что и дорога (config/trackRoad.js) */}
+              {fieldPx > 0 && (
+                <ObstacleLayer
+                  fieldW={roadW}
+                  fieldH={fieldPx}
+                  runId={runId} // ✅ важно: слою нужен runId для "честного" рестарта
+                  setObstacleSnapshotGetter={(getter) => {
+                    // getter — это функция, которая возвращает текущий массив препятствий
+                    obstaclesGetterRef.current = getter;
+                  }}
+                />
+              )}
+
+              {/* Рыбки — награда (не должны лежать на "опасных" препятствиях avoidLane) */}
+              {fieldPx > 0 && (
+                <FishLayer
+                  fieldW={roadW}
+                  fieldH={fieldPx}
+                  getObstacles={() => obstaclesGetterRef.current()}
+                />
+              )}
+
+              {/* Визуальная сетка полос */}
+              <LaneGrid />
+
+              {/* Котик */}
+              <PlayerActor
+                laneIndex={laneIndex}
+                actionState={actionState}
+                selectedCatId={selectedCatId}
+              />
+            </div>
+
+            {/* Правая обочина */}
+            <div className="relative overflow-hidden">
+              {fieldPx > 0 && <TrackShoulder fieldPx={fieldPx} side="right" />}
+            </div>
           </div>
         </div>
       </div>
