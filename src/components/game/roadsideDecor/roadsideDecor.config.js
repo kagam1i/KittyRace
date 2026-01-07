@@ -25,8 +25,16 @@ const PRESET_B = {
   GRASS_CLUMP_CHANCE: 0.26,
 };
 
+const PRESET_C = {
+  // ✅ Плотно (но не каша): меньше пустоты на поле
+  GAP_BASE_Y_PX: 98,
+  GAP_JITTER_Y_PX: 22,
+  SMALL_SPAWN_CHANCE: 0.66,
+  GRASS_CLUMP_CHANCE: 0.32,
+};
+
 // 👉 активный пресет (меняй ТОЛЬКО эту строку)
-const ACTIVE_PRESET = PRESET_A;
+const ACTIVE_PRESET = PRESET_C;
 
 /* =========================================================
    🌿 ОСНОВНАЯ КОНФИГУРАЦИЯ
@@ -65,14 +73,16 @@ export const ROADSIDE_DECOR = {
 
   // --- правила деревьев
   TREE_RULES: {
-    MIN_SPACING_PX: 420, // минимальная дистанция между деревьями
-    CHANCE: 0.85,        // шанс, что попытка "tree" реально станет деревом
+    // ✅ чуть чаще деревья, но не "частокол"
+    MIN_SPACING_PX: 320,
+    CHANCE: 0.9,
   },
 
   // --- ассеты (фактические размеры + слой)
   TYPES: {
     grass: {
-      src: new URL("../../../assets/environment/decor/grass.png", import.meta.url).href,
+      src: new URL("../../../assets/environment/decor/grass.png", import.meta.url)
+        .href,
       w: 31,
       h: 29,
       z: 1,
@@ -80,7 +90,8 @@ export const ROADSIDE_DECOR = {
     },
 
     bush: {
-      src: new URL("../../../assets/environment/decor/bush.png", import.meta.url).href,
+      src: new URL("../../../assets/environment/decor/bush.png", import.meta.url)
+        .href,
       w: 36,
       h: 31,
       z: 2,
@@ -88,7 +99,10 @@ export const ROADSIDE_DECOR = {
     },
 
     flower1: {
-      src: new URL("../../../assets/environment/decor/flower1.png", import.meta.url).href,
+      src: new URL(
+        "../../../assets/environment/decor/flower1.png",
+        import.meta.url
+      ).href,
       w: 28,
       h: 30,
       z: 2,
@@ -96,7 +110,10 @@ export const ROADSIDE_DECOR = {
     },
 
     flower2: {
-      src: new URL("../../../assets/environment/decor/flower2.png", import.meta.url).href,
+      src: new URL(
+        "../../../assets/environment/decor/flower2.png",
+        import.meta.url
+      ).href,
       w: 35,
       h: 34,
       z: 2,
@@ -104,7 +121,10 @@ export const ROADSIDE_DECOR = {
     },
 
     flower3: {
-      src: new URL("../../../assets/environment/decor/flower3.png", import.meta.url).href,
+      src: new URL(
+        "../../../assets/environment/decor/flower3.png",
+        import.meta.url
+      ).href,
       w: 33,
       h: 32,
       z: 2,
@@ -112,7 +132,8 @@ export const ROADSIDE_DECOR = {
     },
 
     tree1: {
-      src: new URL("../../../assets/environment/decor/tree1.png", import.meta.url).href,
+      src: new URL("../../../assets/environment/decor/tree1.png", import.meta.url)
+        .href,
       w: 50,
       h: 61,
       z: 3,
@@ -120,7 +141,8 @@ export const ROADSIDE_DECOR = {
     },
 
     tree2: {
-      src: new URL("../../../assets/environment/decor/tree2.png", import.meta.url).href,
+      src: new URL("../../../assets/environment/decor/tree2.png", import.meta.url)
+        .href,
       w: 51,
       h: 53,
       z: 3,
@@ -128,7 +150,8 @@ export const ROADSIDE_DECOR = {
     },
 
     tree3: {
-      src: new URL("../../../assets/environment/decor/tree3.png", import.meta.url).href,
+      src: new URL("../../../assets/environment/decor/tree3.png", import.meta.url)
+        .href,
       w: 23,
       h: 29,
       z: 3,

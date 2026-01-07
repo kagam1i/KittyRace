@@ -5,17 +5,17 @@ import backgroundImg from "../../assets/background.png";
 
 /**
  * PauseMenu
+ * - overlay поверх GameScreen
  * - “табличка” (ui-board)
  * - кнопки continue / main menu
  *
- * ✅ Облака должны быть НЕ фоном всего экрана,
- * а лёгким слоем ВНУТРИ таблички (как в главном меню по ощущению).
+ * ✅ Облака — ВНУТРИ таблички.
  */
 export function PauseMenu() {
   const dispatch = useDispatch();
 
   return (
-    <div className="min-h-screen grid place-items-center p-6 bg-bg">
+    <div className="absolute inset-0 grid place-items-center p-6 bg-black/30 z-50">
       {/* ui-board — “табличка” */}
       <div
         className="ui-board w-[min(520px,92vw)] p-6 relative overflow-hidden"
@@ -27,7 +27,7 @@ export function PauseMenu() {
           imageRendering: "pixelated",
         }}
       >
-        {/* ✅ Облака — внутри таблички, показываем только верх */}
+        {/* ✅ Облака — внутри таблички */}
         <div
           className="ui-menu-clouds pointer-events-none"
           style={{

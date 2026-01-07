@@ -3,12 +3,18 @@
 // "Глупый" визуальный компонент.
 // Не знает ни про генерацию, ни про скорость, ни про логику.
 // Просто рисует один объект.
+//
+// ✅ Адаптив:
+// теперь принимает scale пропсом, чтобы слой мог clamp’ить его на мобилках.
 // ------------------------------------------------
 
 import { ROADSIDE_DECOR } from "./roadsideDecor.config";
 
-export default function DecorSprite({ type, xPercent, yPx }) {
+export default function DecorSprite({ type, xPercent, yPx, scale }) {
   const decor = ROADSIDE_DECOR.TYPES[type];
+
+  // ✅ по умолчанию оставляем прежнее поведение
+  const usedScale = scale ?? ROADSIDE_DECOR.SCALE;
 
   return (
     <img
@@ -19,8 +25,8 @@ export default function DecorSprite({ type, xPercent, yPx }) {
       style={{
         left: `${xPercent}%`,
         top: `${yPx}px`,
-        width: decor.w * ROADSIDE_DECOR.SCALE,
-        height: decor.h * ROADSIDE_DECOR.SCALE,
+        width: decor.w * usedScale,
+        height: decor.h * usedScale,
         transform: "translateX(-50%)",
         imageRendering: "pixelated",
         zIndex: decor.z,

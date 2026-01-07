@@ -6,9 +6,15 @@
 // - равные шансы типов
 // - редкие, но заметные деревья
 // - первичное заполнение всей высоты
+//
+// ✅ Mobile adaptive fix:
+// - на мобилках обочина узкая
+// - если рисовать спрайты с фиксированным ROADSIDE_DECOR.SCALE,
+//   декор начинает вылезать/обрезаться overflow'ом
+// - поэтому вычисляем maxScale по shoulderW и передаём в DecorSprite
 // --------------------------------------------------------
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ROADSIDE_DECOR } from "./roadsideDecor.config";
 import DecorSprite from "./DecorSprite";
 
@@ -54,21 +60,57 @@ function pickCategory() {
   return Math.random() < 0.6 ? "tree" : "small";
 }
 
-export default function RoadsideDecorLayer({ side, scrollSpeedPxPerSec }) {
+export default function RoadsideDecorLayer({
+  side,
+  scrollSpeedPxPerSec,
+  shoulderW, // ✅ приходит из TrackShoulders.jsx
+}) {
   const hostRef = useRef(null);
   const [hostH, setHostH] = useState(0);
+  const [hostW, setHostW] = useState(0);
+
   const lastTreeYRef = useRef(null);
   const [items, setItems] = useState([]);
 
+  // меряем контейнер (на всякий случай). shoulderW — основной источник ширины.
   useEffect(() => {
     const el = hostRef.current;
     if (!el) return;
 
-    const measure = () => setHostH(el.clientHeight || 0);
+    const measure = () => {
+      setHostH(el.clientHeight || 0);
+      setHostW(el.clientWidth || 0);
+    };
+
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, []);
+
+  // -------------------------------------------------------
+  // ✅ Адаптивный scale по ширине обочины
+  // -------------------------------------------------------
+  const effectiveShoulderW = useMemo(() => {
+    // предпочитаем shoulderW (точнее отражает обочину),
+    // но если не пришёл — fallback на реальную ширину контейнера
+    return Math.max(1, shoulderW ?? hostW ?? 1);
+  }, [shoulderW, hostW]);
+
+  function getMaxScaleForType(type) {
+    const decor = ROADSIDE_DECOR.TYPES[type];
+    if (!decor) return ROADSIDE_DECOR.SCALE;
+
+    // usable ширина (чуть меньше фактической), чтобы не прилипать к краям
+    const usableW = effectiveShoulderW * 0.92;
+
+    // scale чтобы влезло по ширине: decor.w * scale <= usableW
+    const fitScale = usableW / decor.w;
+
+    // clamp:
+    // - снизу ограничиваем, чтобы не становилось слишком мелко
+    // - сверху не превышаем художественный ROADSIDE_DECOR.SCALE
+    return clamp(fitScale, 0.75, ROADSIDE_DECOR.SCALE);
+  }
 
   function getXPercentForGroup(group) {
     const ranges = ROADSIDE_DECOR.X_BY_TYPE_PERCENT[group];
@@ -82,13 +124,14 @@ export default function RoadsideDecorLayer({ side, scrollSpeedPxPerSec }) {
       type,
       y,
       xPercent: xPercent ?? getXPercentForGroup(group),
+      group,
     };
   }
 
   function canSpawnTreeAtY(y) {
     const lastY = lastTreeYRef.current;
     if (lastY == null) return true;
-    return lastY - y >= ROADSIDE_DECOR.TREE_RULES.MIN_SPACING_PX;
+    return lastTreeYRef.current - y >= ROADSIDE_DECOR.TREE_RULES.MIN_SPACING_PX;
   }
 
   function pickTypeForSpawnY(y) {
@@ -115,6 +158,7 @@ export default function RoadsideDecorLayer({ side, scrollSpeedPxPerSec }) {
 
     lastTreeYRef.current = null;
     const start = [];
+
     let y = -ROADSIDE_DECOR.DESPAWN_PADDING_PX;
 
     while (y < hostH + ROADSIDE_DECOR.DESPAWN_PADDING_PX) {
@@ -122,6 +166,7 @@ export default function RoadsideDecorLayer({ side, scrollSpeedPxPerSec }) {
         const { type, group } = pickTypeForSpawnY(y);
         start.push(makeItem({ type, y, group }));
 
+        // "пучок травы" (2 травинки рядом)
         if (
           type === "grass" &&
           Math.random() < ROADSIDE_DECOR.GRASS_CLUMP.CHANCE
@@ -198,6 +243,8 @@ export default function RoadsideDecorLayer({ side, scrollSpeedPxPerSec }) {
           type={it.type}
           xPercent={it.xPercent}
           yPx={it.y}
+          // ✅ вот он: scale под ширину обочины
+          scale={getMaxScaleForType(it.type)}
         />
       ))}
     </div>

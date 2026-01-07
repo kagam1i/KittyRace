@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import leftImg from "../../assets/environment/left_road.png";
 import rightImg from "../../assets/environment/right_road.png";
@@ -6,12 +6,8 @@ import rightImg from "../../assets/environment/right_road.png";
 import {
   ROAD_SCROLL_SPEED_PX_PER_SEC,
   SHOULDER_TILE_SOURCE_PX,
+  SHOULDER_STRIP_PERCENT,
 } from "../../config/trackRoad";
-
-// ⚠️ В этом слое мы НЕ используем параллакс.
-// Причина: у декораций есть собственные правила спавна/анти-оверлап.
-// При разных скоростях элементы начинают "догонять" друг друга и визуально
-// будто "прилипают". Для уютного runner'а это выглядит странно.
 
 // слой декораций поверх обочины
 import RoadsideDecorLayer from "./roadsideDecor/RoadsideDecorLayer";
@@ -21,14 +17,23 @@ import RoadsideDecorLayer from "./roadsideDecor/RoadsideDecorLayer";
  * рисует одну обочину (left или right)
  * скроллит её вниз
  *
- * ⚠️ Без параллакса:
+ * ✅ Без параллакса:
  * обочина и её декорации едут с той же скоростью, что и дорога.
- * Так элементы сохраняют стабильное расстояние друг от друга.
+ *
+ * ✅ Адаптив:
+ * - на мобильных обочина очень узкая
+ * - мы вычисляем shoulderW и прокидываем в декор-слой,
+ *   чтобы он мог clamp’ить scale и не вылезать за границы.
  */
 export function TrackShoulder({ fieldPx, side }) {
   const layerRef = useRef(null);
 
   const img = side === "left" ? leftImg : rightImg;
+
+  // ✅ ширина обочины в px (важно для адаптива декора)
+  const shoulderW = useMemo(() => {
+    return (fieldPx * SHOULDER_STRIP_PERCENT) / 100;
+  }, [fieldPx]);
 
   // высота тайла по пропорции исходной картинки
   const tileHeightPx = Math.round(
@@ -47,13 +52,10 @@ export function TrackShoulder({ fieldPx, side }) {
       const dt = (ts - last) / 1000;
       last = ts;
 
-      // ✅ Без параллакса — синхронно с дорогой
       offset += ROAD_SCROLL_SPEED_PX_PER_SEC * dt;
-
       const looped = tileHeightPx > 0 ? offset % tileHeightPx : 0;
 
       el.style.backgroundPosition = `center ${looped}px`;
-
       raf = requestAnimationFrame(tick);
     };
 
@@ -81,6 +83,7 @@ export function TrackShoulder({ fieldPx, side }) {
       <RoadsideDecorLayer
         side={side}
         scrollSpeedPxPerSec={ROAD_SCROLL_SPEED_PX_PER_SEC}
+        shoulderW={shoulderW}
       />
     </div>
   );

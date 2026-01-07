@@ -4,224 +4,157 @@ import { useDispatch, useSelector } from "react-redux";
 import FishSprite from "./FishSprite";
 import { FISH_CONFIG } from "./fish.config";
 
-// Используем размеры препятствий из конфига,
-// чтобы проверка "рыба НЕ на obstacle" была в той же системе координат.
-import { OBSTACLES_CONFIG } from "../obstacles/obstacles.config";
-
 import { addFish } from "../../../features/game/gameSlice";
 import { PLAYER_RENDER } from "../../../config/playerRender";
+import { ROAD_SCROLL_SPEED_PX_PER_SEC } from "../../../config/trackRoad";
 
-// ---------------- utils ----------------
 function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
-// ---------------------------------------
 
-/**
- * FishLayer
- * - генерирует рыбы на дорожке
- * - двигает вниз
- * - даёт подобрать игроку
- *
- * ✅ getObstacles:
- * Функция, которая возвращает текущие препятствия.
- * Мы используем это, чтобы рыба НЕ появлялась на “опасных” препятствиях avoidLane.
- */
-export default function FishLayer({ fieldW, fieldH, getObstacles }) {
+export default function FishLayer({
+  fieldW,
+  fieldH,
+  getObstacles,
+  setFishSnapshotGetter, // ✅ НОВОЕ
+}) {
   const dispatch = useDispatch();
-
   const status = useSelector((s) => s.game.status);
   const laneIndex = useSelector((s) => s.game.laneIndex);
 
   const fishRef = useRef([]);
   const lastTimeRef = useRef(0);
-
-  // сколько пикселей “проехать” до следующей рыбы
   const nextSpawnPxRef = useRef(
     randInt(FISH_CONFIG.SPAWN_GAP_PX.min, FISH_CONFIG.SPAWN_GAP_PX.max)
   );
 
   const [, forceUpdate] = useState(0);
 
-  // центры 5 полос в px внутри дороги
-  const laneCenters = useMemo(() => {
-    const laneW = fieldW / 5;
-    return Array.from({ length: 5 }, (_, i) => laneW * (i + 0.5));
-  }, [fieldW]);
+  // 🔁 отдаём наружу актуальный список рыб
+  useEffect(() => {
+    if (!setFishSnapshotGetter) return;
+    setFishSnapshotGetter(() => fishRef.current);
+    return () => setFishSnapshotGetter(() => []);
+  }, [setFishSnapshotGetter]);
 
-  // линия подбора игрока по Y (снизу)
-  const playerPickupY = useMemo(() => {
-    const MINOR_OFFSET_PX = 10;
-    return fieldH - PLAYER_RENDER.GROUND_BOTTOM_PX - MINOR_OFFSET_PX;
-  }, [fieldH]);
+  const laneW = useMemo(() => fieldW / 5, [fieldW]);
 
-  // ✅ NEW:
-  // Вместо "окна по центрам" используем пересечение хитбоксов по Y.
-  // Так рыба гарантированно не окажется "на" avoidLane препятствии.
-  //
-  // Мы не берём точные размеры спрайтов (чтобы не усложнять),
-  // а используем честные приближённые half-height'ы.
-  const FISH_HALF_H_PX = Math.round(
-    ((FISH_CONFIG.SIZE_PX * (FISH_CONFIG.SCALE ?? 1)) / 2) * 0.8
+  const laneCenters = useMemo(
+    () => Array.from({ length: 5 }, (_, i) => laneW * (i + 0.5)),
+    [laneW]
   );
 
-  // avoidLane препятствия визуально крупнее рыбы.
-  // Берём логический размер из obstacles.config (BASE_SIZE_PX * SCALE),
-  // иначе можно недооценить размер и “пропустить” пересечение.
-  const AVOID_HALF_H_PX = Math.round(
-    (OBSTACLES_CONFIG.BASE_SIZE_PX * OBSTACLES_CONFIG.SCALE) / 2
+  const maxFishScale = useMemo(() => {
+    const s = (laneW * 0.85) / FISH_CONFIG.SIZE_PX;
+    return Math.max(0.85, Math.min(FISH_CONFIG.SCALE, s));
+  }, [laneW]);
+
+  const pickupY = useMemo(
+    () => fieldH - PLAYER_RENDER.GROUND_BOTTOM_PX - 10,
+    [fieldH]
   );
 
-  // небольшой “воздух”, чтобы не выглядело как наложение
-  const AVOID_PADDING_PX = 10;
+  const AVOID_SPAWN_WINDOW_PX = 360;
+  const PREHIDE_WINDOW_PX = 520;
+  const REMOVE_AFTER_MS = 170;
 
-  function isLaneBlockedByAvoidObstacle(lane, fishY) {
-    const obstaclesRaw =
-      typeof getObstacles === "function" ? getObstacles() : [];
-    const obstacles = Array.isArray(obstaclesRaw) ? obstaclesRaw : [];
+  function getObstaclesSafe() {
+    const raw = typeof getObstacles === "function" ? getObstacles() : [];
+    return Array.isArray(raw) ? raw : [];
+  }
 
-    for (const o of obstacles) {
-      if (o.rule !== "avoidLane") continue;
-      if (o.lane !== lane) continue;
+  function hasSidestep(lane, y, win) {
+    return getObstaclesSafe().some(
+      (o) =>
+        o.rule === "avoidLane" &&
+        o.lane === lane &&
+        Math.abs(o.y - y) < win
+    );
+  }
 
-      // ✅ Проверяем пересечение по Y как у двух прямоугольников:
-      // overlap, если расстояние между центрами меньше суммы half-heights (+ padding)
-      const overlapY =
-        Math.abs(o.y - fishY) <
-        FISH_HALF_H_PX + AVOID_HALF_H_PX + AVOID_PADDING_PX;
+  function spawnFish(y) {
+    for (let i = 0; i < 18; i++) {
+      const lane = randInt(0, 4);
+      if (hasSidestep(lane, y, AVOID_SPAWN_WINDOW_PX)) continue;
 
-      if (overlapY) return true;
+      fishRef.current.push({
+        id: crypto.randomUUID(),
+        lane,
+        x: laneCenters[lane],
+        y,
+        picked: false,
+        pickedAt: 0,
+        hidden: false,
+      });
+      return;
     }
-
-    return false;
   }
 
-  function spawnFishAtY(y) {
-    // Пытаемся найти “свободную” полосу.
-    // Важно: делаем несколько попыток и, если не вышло, просто пропускаем спавн.
-    let lane = randInt(0, 4);
-
-    let ok = false;
-    for (let tries = 0; tries < 7; tries++) {
-      lane = randInt(0, 4);
-
-      if (!isLaneBlockedByAvoidObstacle(lane, y)) {
-        ok = true;
-        break;
-      }
-    }
-
-    if (!ok) return;
-
-    fishRef.current.push({
-      id: crypto.randomUUID(),
-      lane,
-      x: laneCenters[lane],
-      y,
-      picked: false,
-    });
-  }
-
-  // ✅ Дополнительная защита:
-  // даже если рыба заспавнилась "чуть раньше", чем obstacle (в том же кадре),
-  // мы не хотим видеть наложение. Поэтому на каждом кадре удаляем рыб,
-  // которые оказались на avoidLane препятствии.
-  function filterFishNotOnAvoidObstacles(list) {
-    return list.filter((f) => !isLaneBlockedByAvoidObstacle(f.lane, f.y));
-  }
-
-  // prewarm — чтобы при старте поле не было пустым
   function prewarm() {
-    const count = 5;
-    const gap = 120;
-
-    for (let i = 0; i < count; i++) {
-      spawnFishAtY(-40 - i * gap);
-    }
-
-    nextSpawnPxRef.current = randInt(60, 120);
+    for (let i = 0; i < 5; i++) spawnFish(-60 - i * 120);
+    nextSpawnPxRef.current = randInt(80, 140);
   }
 
   useEffect(() => {
     if (status !== "running") return;
-
-    // после паузы/резюма: сбрасываем только время, чтобы не было “скачка”
     lastTimeRef.current = 0;
+    if (!fishRef.current.length) prewarm();
 
-    // prewarm только если рыб ещё нет (старт новой попытки / первый старт)
-    // ⚠️ на pause/resume массив НЕ очищается, значит prewarm не вызовется => всё продолжится.
-    if (fishRef.current.length === 0) {
-      prewarm();
-    }
-
-    let rafId;
-
+    let raf;
     function frame(t) {
       if (!lastTimeRef.current) lastTimeRef.current = t;
       const dt = (t - lastTimeRef.current) / 1000;
       lastTimeRef.current = t;
 
-      const dy = FISH_CONFIG.SPEED_PX_PER_SEC * dt;
+      const dy = ROAD_SCROLL_SPEED_PX_PER_SEC * dt;
 
-      // 1) движение вниз
       fishRef.current.forEach((f) => (f.y += dy));
 
-      // 1.1) ✅ убираем рыбы, которые "оказались" на avoidLane препятствиях
-      // (страховка от ситуации, когда obstacle появился сразу после спавна рыбы)
-      fishRef.current = filterFishNotOnAvoidObstacles(fishRef.current);
+      // ❌ УБИРАЕМ ТОЛЬКО ВНЕ ЭКРАНА
+      fishRef.current = fishRef.current.map((f) => {
+        if (f.hidden || f.picked) return f;
+        if (f.y < 0 && hasSidestep(f.lane, f.y, PREHIDE_WINDOW_PX)) {
+          return { ...f, hidden: true };
+        }
+        return f;
+      });
 
-      // 2) чистим ушедшие вниз и подобранные
-      fishRef.current = fishRef.current.filter(
-        (f) => !f.picked && f.y < fieldH + 60
-      );
+      for (const f of fishRef.current) {
+        if (f.hidden || f.picked) continue;
+        if (Math.abs(f.y - pickupY) < FISH_CONFIG.PICKUP_WINDOW_PX) {
+          if (f.lane === laneIndex) {
+            f.picked = true;
+            f.pickedAt = t;
+            dispatch(addFish(1));
+          }
+        }
+      }
 
-      // 3) спавн по расстоянию
+      fishRef.current = fishRef.current.filter((f) => {
+        if (f.hidden) return false;
+        if (f.picked) return t - f.pickedAt < REMOVE_AFTER_MS;
+        return f.y < fieldH + 60;
+      });
+
       nextSpawnPxRef.current -= dy;
       if (nextSpawnPxRef.current <= 0) {
-        spawnFishAtY(-30);
+        spawnFish(-40);
         nextSpawnPxRef.current = randInt(
           FISH_CONFIG.SPAWN_GAP_PX.min,
           FISH_CONFIG.SPAWN_GAP_PX.max
         );
       }
 
-      // 4) подбор
-      for (const f of fishRef.current) {
-        if (f.picked) continue;
-
-        const hitY =
-          Math.abs(f.y - playerPickupY) <= FISH_CONFIG.PICKUP_WINDOW_PX;
-        if (!hitY) continue;
-
-        if (f.lane === laneIndex) {
-          f.picked = true;
-          dispatch(addFish(1));
-        }
-      }
-
       forceUpdate((x) => x + 1);
-      rafId = requestAnimationFrame(frame);
+      raf = requestAnimationFrame(frame);
     }
 
-    rafId = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(rafId);
-  }, [
-    status,
-    fieldH,
-    laneIndex,
-    laneCenters,
-    playerPickupY,
-    dispatch,
-    getObstacles,
-  ]);
-
-  const FISH_Z = 7;
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [status, fieldH, laneIndex, laneCenters, pickupY, dispatch, getObstacles]);
 
   return (
-    <div
-      className="absolute inset-0 pointer-events-none"
-      style={{ zIndex: FISH_Z }}
-    >
+    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 7 }}>
       {fishRef.current.map((f) => (
         <FishSprite
           key={f.id}
@@ -229,9 +162,8 @@ export default function FishLayer({ fieldW, fieldH, getObstacles }) {
           x={f.x}
           y={f.y}
           sizePx={FISH_CONFIG.SIZE_PX}
-          scale={FISH_CONFIG.SCALE}
-          picked={f.picked} // ✅ триггер pop-эффекта
-          zIndex={FISH_Z}
+          scale={maxFishScale}
+          picked={f.picked}
         />
       ))}
     </div>

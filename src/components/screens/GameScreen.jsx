@@ -1,3 +1,5 @@
+// src/components/screens/GameScreen.jsx
+//
 // GameScreen — экран "running":
 // 1) Рисуем квадратное игровое поле
 // 2) Слои внутри дороги:
@@ -8,17 +10,25 @@
 //    - PlayerActor (котик)
 // 3) Слева/справа — TrackShoulder (обочины + декор внутри).
 //
-// Важно про паузу:
+// ✅ Важно про паузу:
 // - На pause/resume мы НЕ должны перемонтировать ObstacleLayer/FishLayer,
-//   иначе их внутреннее состояние (refs) сбросится и игра "начнётся заново".
+//   иначе их внутреннее состояние (refs) сбросится.
 // - Поэтому тут НЕТ key={runId} на слоях.
-// - Полный рестарт делается через runId внутри слоёв (ObstacleLayer смотрит runId и чистит refs сам).
+// - Полный рестарт делается через runId внутри слоёв.
+//
+// ✅ Важно про fish <-> sidestep:
+// - FishLayer НЕ должен “в кадре” резко удалять рыбу из-за sidestep.
+// - Чтобы этого не было, мы запрещаем ObstacleLayer спавнить sidestep
+//   рядом с уже существующими рыбами.
+// - Для этого FishLayer отдаёт наружу getter рыб,
+//   а ObstacleLayer получает getFish.
 
 import { useDispatch, useSelector } from "react-redux";
 import { useRef } from "react";
 
 import { TrackRoad } from "../game/TrackRoad";
 import { TrackShoulder } from "../game/TrackShoulders";
+
 import ObstacleLayer from "../game/obstacles/ObstacleLayer";
 import FishLayer from "../game/pickups/FishLayer";
 
@@ -28,6 +38,7 @@ import { SHOULDER_STRIP_PERCENT } from "../../config/trackRoad";
 
 import { useSquareFieldSize } from "./gameScreen/useSquareFieldSize";
 import { useGameControls } from "./gameScreen/useGameControls";
+
 import GameHud from "./gameScreen/GameHud";
 import LaneGrid from "./gameScreen/LaneGrid";
 import PlayerActor from "./gameScreen/PlayerActor";
@@ -35,42 +46,50 @@ import PlayerActor from "./gameScreen/PlayerActor";
 export function GameScreen() {
   const dispatch = useDispatch();
 
-  // Глобальное состояние (Redux)
-  const laneIndex = useSelector((state) => state.game.laneIndex);
-  const actionState = useSelector((state) => state.game.actionState);
-  const selectedCatId = useSelector((state) => state.game.selectedCatId);
+  // --- Redux state ---
+  const laneIndex = useSelector((s) => s.game.laneIndex);
+  const actionState = useSelector((s) => s.game.actionState);
+  const selectedCatId = useSelector((s) => s.game.selectedCatId);
 
-  // runId увеличивается только на новый забег (start/restart),
-  // а на pause/resume НЕ должен меняться.
-  // Он нужен, чтобы слои (ObstacleLayer/FishLayer) понимали,
-  // что началась новая попытка и можно очистить внутренние refs.
+  // runId меняется ТОЛЬКО на новый забег (start/restart),
+  // на pause/resume оставляем тем же.
   const runId = useSelector((s) => s.game.runId);
 
-  // ✅ FishLayer должен знать про текущие препятствия (чтобы не класть рыбу на avoidLane)
-  // Мы не тащим это в Redux, а просто храним "геттер" в ref.
-  const obstaclesGetterRef = useRef(() => []);
-
-  // Управление (стрелки/wasd + jump/slide + pause)
-  useGameControls();
-
-  // Размер игрового поля
+  // --- Размер поля ---
   const { fieldRef, fieldPx } = useSquareFieldSize();
 
-  // Размер центральной колонки дороги (76% ширины поля)
-  const roadW = Math.floor(fieldPx * (1 - (SHOULDER_STRIP_PERCENT * 2) / 100));
+  // --- Управление (клавиатура + swipe на поле) ---
+  useGameControls(fieldRef);
+
+  // ✅ Getter препятствий (FishLayer использует, чтобы не спавнить рыбу на avoidLane)
+  const obstaclesGetterRef = useRef(() => []);
+
+  // ✅ Getter рыб (ObstacleLayer использует, чтобы не спавнить sidestep рядом с рыбой)
+  const fishGetterRef = useRef(() => []);
+
+  // ширина центральной дороги (без обочин)
+  const roadW = Math.floor(
+    fieldPx * (1 - (SHOULDER_STRIP_PERCENT * 2) / 100)
+  );
 
   return (
-    <div className="min-h-screen bg-bg grid place-items-center">
-      {/* Обёртка, чтобы приклеить HUD к полю, но держать его снаружи */}
-      <div className="relative w-[min(640px,96vw)]">
+    <div className="min-h-[100svh] bg-bg grid place-items-center p-3 sm:p-6">
+      {/* Обёртка: держим HUD “приклеенным” к полю */}
+      <div
+        className="relative w-full"
+        // ✅ адаптив: поле не должно вылезать за экран по высоте на мобилке
+        style={{ width: "min(640px, 96vw, calc(100svh - 160px))" }}
+      >
         <GameHud onMenuClick={() => dispatch(pauseGame())} />
 
         {/* Игровое поле */}
         <div
-          className="relative w-full aspect-square rounded-none bg-bg border border-border shadow-soft overflow-hidden"
           ref={fieldRef}
+          className="relative w-full aspect-square rounded-none bg-bg border border-border shadow-soft overflow-hidden"
+          // ✅ важно для touch: свайпы не конфликтуют со скроллом/зумом страницы
+          style={{ touchAction: "none" }}
         >
-          {/* Делим поле на 3 колонки: обочина | дорога (5 lanes) | обочина */}
+          {/* Делим поле: обочина | дорога | обочина */}
           <div
             className="absolute inset-0 grid"
             style={{
@@ -84,36 +103,44 @@ export function GameScreen() {
               {fieldPx > 0 && <TrackShoulder fieldPx={fieldPx} side="left" />}
             </div>
 
-            {/* Центр: дорога + полосы + препятствия + рыбы + кот */}
+            {/* Центр: дорога + слои */}
             <div className="relative overflow-hidden">
+              {/* Фон дороги */}
               {fieldPx > 0 && <TrackRoad fieldPx={roadW} />}
 
-              {/* Препятствия — едут той же скоростью, что и дорога (config/trackRoad.js) */}
+              {/* Препятствия */}
               {fieldPx > 0 && (
                 <ObstacleLayer
                   fieldW={roadW}
                   fieldH={fieldPx}
-                  runId={runId} // ✅ важно: слою нужен runId для "честного" рестарта
+                  runId={runId}
+                  // ✅ чтобы sidestep не спавнился рядом с рыбой (и рыбы не “исчезали”)
+                  getFish={() => fishGetterRef.current()}
+                  // ✅ наружу отдаём getter препятствий (для FishLayer)
                   setObstacleSnapshotGetter={(getter) => {
-                    // getter — это функция, которая возвращает текущий массив препятствий
                     obstaclesGetterRef.current = getter;
                   }}
                 />
               )}
 
-              {/* Рыбки — награда (не должны лежать на "опасных" препятствиях avoidLane) */}
+              {/* Рыбы */}
               {fieldPx > 0 && (
                 <FishLayer
                   fieldW={roadW}
                   fieldH={fieldPx}
+                  // ✅ рыбы не спавнятся на avoidLane
                   getObstacles={() => obstaclesGetterRef.current()}
+                  // ✅ наружу отдаём getter рыб (для ObstacleLayer)
+                  setFishSnapshotGetter={(getter) => {
+                    fishGetterRef.current = getter;
+                  }}
                 />
               )}
 
-              {/* Визуальная сетка полос */}
+              {/* Линии полос (визуально) */}
               <LaneGrid />
 
-              {/* Котик */}
+              {/* Игрок */}
               <PlayerActor
                 laneIndex={laneIndex}
                 actionState={actionState}
