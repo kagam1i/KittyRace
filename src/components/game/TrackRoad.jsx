@@ -1,46 +1,51 @@
 import { useEffect, useRef } from "react";
 
 import roadTileImg from "../../assets/environment/road_tile.png";
-import {
-  ROAD_SCROLL_SPEED_PX_PER_SEC,
-  ROAD_TILE_SOURCE_PX,
-} from "../../config/trackRoad";
+import { ROAD_TILE_SOURCE_PX } from "../../config/trackRoad";
 
 /**
  * TrackRoad:
- * берёт тайл дороги road_tile.png
- * повторяет его по вертикали (repeat-y)
- * двигает background-position, создавая бесконечный скролл
+ * - рисует тайл дороги
+ * - повторяет его по вертикали
+ * - двигает background-position, создавая бесконечный скролл
+ *
+ * Важно:
+ * - если передан worldOffsetRef, дорога использует его.
+ * - offset округляется до целых пикселей, чтобы не было дрожания pixel-art.
  */
-export function TrackRoad({ fieldPx }) {
+export function TrackRoad({ fieldPx, status, scrollSpeedRef, worldOffsetRef }) {
   const layerRef = useRef(null);
 
-  // Высота одного тайла на экране (px),
-  // считаем через пропорцию исходного изображения
+  // fallback, если worldOffsetRef не передали
+  const localOffsetRef = useRef(0);
+
+  // Высота тайла на экране
   const tileHeightPx = Math.round(
-    fieldPx *
-      (ROAD_TILE_SOURCE_PX.height / ROAD_TILE_SOURCE_PX.width)
+    fieldPx * (ROAD_TILE_SOURCE_PX.height / ROAD_TILE_SOURCE_PX.width)
   );
 
   useEffect(() => {
     const el = layerRef.current;
     if (!el) return;
+    if (status !== "running") return;
 
     let raf = 0;
     let last = performance.now();
-    let offset = 0;
 
     const tick = (ts) => {
       const dt = (ts - last) / 1000;
       last = ts;
 
-      offset += ROAD_SCROLL_SPEED_PX_PER_SEC * dt;
+      let offset = worldOffsetRef?.current;
+      if (typeof offset !== "number") {
+        const speed = scrollSpeedRef?.current ?? 0;
+        localOffsetRef.current += speed * dt;
+        offset = localOffsetRef.current;
+      }
 
-      // Зацикливание смещения по высоте тайла
-      const looped =
-        tileHeightPx > 0 ? offset % tileHeightPx : 0;
+      const rounded = Math.round(offset);
+      const looped = tileHeightPx > 0 ? rounded % tileHeightPx : 0;
 
-      // трасса визуально едет вниз → фон тоже смещается вниз
       el.style.backgroundPosition = `center ${looped}px`;
 
       raf = requestAnimationFrame(tick);
@@ -48,13 +53,10 @@ export function TrackRoad({ fieldPx }) {
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [tileHeightPx]);
+  }, [tileHeightPx, status, scrollSpeedRef, worldOffsetRef]);
 
   return (
-    <div
-      className="absolute inset-0 overflow-hidden pointer-events-none"
-      aria-hidden="true"
-    >
+    <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
       <div
         ref={layerRef}
         className="absolute inset-0"

@@ -10,7 +10,7 @@ import fishIcon from "../../assets/environment/fish.png";
  * - restart / main menu
  * - показываем собранных рыб
  *
- * ✅ Облака должны быть ВНУТРИ таблички (а не на весь экран).
+ * Облака должны быть ВНУТРИ таблички (а не на весь экран).
  */
 export function GameOverMenu() {
   const dispatch = useDispatch();
@@ -31,7 +31,7 @@ export function GameOverMenu() {
           imageRendering: "pixelated",
         }}
       >
-        {/* ✅ Облака — внутри таблички, только верх */}
+        {/* Облака — внутри таблички, только верх */}
         <div
           className="ui-menu-clouds pointer-events-none"
           style={{

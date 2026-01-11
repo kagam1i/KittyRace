@@ -4,7 +4,6 @@ import { useDispatch, useSelector } from "react-redux";
 import ObstacleSprite from "./ObstacleSprite";
 import { OBSTACLE_TYPES, OBSTACLES_CONFIG } from "./obstacles.config";
 import { gameOver } from "../../../features/game/gameSlice";
-import { ROAD_SCROLL_SPEED_PX_PER_SEC } from "../../../config/trackRoad";
 import { PLAYER_RENDER } from "../../../config/playerRender";
 
 function randInt(min, max) {
@@ -12,48 +11,52 @@ function randInt(min, max) {
 }
 
 function pickWeighted(list) {
-  const sum = list.reduce((s, x) => s + x.w, 0);
+  const safe = Array.isArray(list) ? list : [];
+  if (safe.length === 0) return null;
+
+  const sum = safe.reduce((s, x) => s + (x?.w ?? 0), 0);
+  if (sum <= 0) return safe[0]?.type ?? null;
+
   let r = Math.random() * sum;
-  for (const x of list) {
+  for (const x of safe) {
     r -= x.w;
     if (r <= 0) return x.type;
   }
-  return list[0].type;
+  return safe[0].type;
+}
+
+function makeId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
 export default function ObstacleLayer({
   fieldW,
   fieldH,
   runId,
+  scrollSpeedRef,
+  worldOffsetRef,
   setObstacleSnapshotGetter,
-  getFish, // ✅ НОВОЕ
+  getFish,
 }) {
   const dispatch = useDispatch();
   const status = useSelector((s) => s.game.status);
   const laneIndex = useSelector((s) => s.game.laneIndex);
   const actionState = useSelector((s) => s.game.actionState);
 
+  const hostRef = useRef(null);
+
+  // fallback offset (если worldOffsetRef не передали)
+  const localOffsetRef = useRef(0);
+
   const obstaclesRef = useRef([]);
   const lastTimeRef = useRef(0);
+
   const nextSpawnPxRef = useRef(
-    randInt(
-      OBSTACLES_CONFIG.SPAWN_GAP_PX.min,
-      OBSTACLES_CONFIG.SPAWN_GAP_PX.max
-    )
+    randInt(OBSTACLES_CONFIG.SPAWN_GAP_PX.min, OBSTACLES_CONFIG.SPAWN_GAP_PX.max)
   );
 
-  const [, forceUpdate] = useState(0);
-
-  useEffect(() => {
-    if (!setObstacleSnapshotGetter) return;
-    setObstacleSnapshotGetter(() => obstaclesRef.current);
-    return () => setObstacleSnapshotGetter(() => []);
-  }, [setObstacleSnapshotGetter]);
-
-  useEffect(() => {
-    obstaclesRef.current = [];
-    lastTimeRef.current = 0;
-  }, [runId]);
+  const [, bumpRender] = useState(0);
 
   const laneCenters = useMemo(() => {
     const laneW = fieldW / 5;
@@ -66,91 +69,170 @@ export default function ObstacleLayer({
     return Math.max(0.85, Math.min(OBSTACLES_CONFIG.SCALE, s));
   }, [laneW]);
 
-  function fishConflict(lane, y) {
+  function getOffsetFloat() {
+    const shared = worldOffsetRef?.current;
+    if (typeof shared === "number") return shared;
+    return localOffsetRef.current;
+  }
+
+  function getOffsetRenderPx() {
+    return Math.round(getOffsetFloat());
+  }
+
+  // ✅ snapshot наружу: экранные координаты + typeId
+  useEffect(() => {
+    if (!setObstacleSnapshotGetter) return;
+
+    setObstacleSnapshotGetter(() => {
+      return () => {
+        const offset = getOffsetRenderPx();
+        return obstaclesRef.current.map((o) => ({
+          id: o.id,
+          lane: o.lane,
+          y: o.y + offset, // screenY
+          rule: o.rule,
+          needAction: o.needAction,
+          typeId: o.typeId, // ✅ ключ: "jump" | "slide" | "sidestep"
+        }));
+      };
+    });
+
+    return () => setObstacleSnapshotGetter(() => []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setObstacleSnapshotGetter]);
+
+  useEffect(() => {
+    obstaclesRef.current = [];
+    lastTimeRef.current = 0;
+    localOffsetRef.current = 0;
+
+    nextSpawnPxRef.current = randInt(
+      OBSTACLES_CONFIG.SPAWN_GAP_PX.min,
+      OBSTACLES_CONFIG.SPAWN_GAP_PX.max
+    );
+
+    if (hostRef.current) hostRef.current.style.transform = "translate3d(0px, 0px, 0px)";
+    bumpRender((x) => x + 1);
+  }, [runId]);
+
+  function getFishListSafe() {
     const list = typeof getFish === "function" ? getFish() : [];
-    return list.some(
-      (f) =>
-        !f.picked &&
-        !f.hidden &&
-        f.lane === lane &&
-        Math.abs(f.y - y) < 420
+    return Array.isArray(list) ? list : [];
+  }
+
+  function fishConflict(lane, yWorld) {
+    const screenY = yWorld + getOffsetRenderPx();
+    const fishList = getFishListSafe();
+
+    return fishList.some((f) => {
+      if (!f) return false;
+      const fLane = f.lane ?? f.laneIndex;
+      const fY = f.y;
+      return !f.picked && !f.hidden && fLane === lane && typeof fY === "number" && Math.abs(fY - screenY) < 420;
+    });
+  }
+
+  function laneHasEnoughGap(lane, yWorld) {
+    return !obstaclesRef.current.some(
+      (o) => o.lane === lane && Math.abs(o.y - yWorld) < OBSTACLES_CONFIG.SAME_LANE_MIN_GAP_PX
     );
   }
 
-  function spawnAtY(y) {
+  function laneHasEnoughActionSwitchGap(lane, yWorld, type) {
+    if (type.rule !== "needAction") return true;
+
+    const next = obstaclesRef.current.find((o) => o.lane === lane && o.y > yWorld);
+    if (!next || next.rule !== "needAction") return true;
+    if (next.needAction === type.needAction) return true;
+
+    return next.y - yWorld >= OBSTACLES_CONFIG.ACTION_SWITCH_MIN_GAP_PX;
+  }
+
+  function spawnAtYWorld(yWorld) {
     const typeId = pickWeighted(OBSTACLES_CONFIG.TYPE_WEIGHTS);
+    if (!typeId) return;
+
     const type = OBSTACLE_TYPES[typeId];
+    if (!type) return;
 
     for (let i = 0; i < 16; i++) {
       const lane = randInt(0, 4);
 
-      if (
-        !laneHasEnoughGap(lane, y) ||
-        !laneHasEnoughActionSwitchGap(lane, y, type)
-      )
-        continue;
+      if (!laneHasEnoughGap(lane, yWorld)) continue;
+      if (!laneHasEnoughActionSwitchGap(lane, yWorld, type)) continue;
 
-      if (type.rule === "avoidLane" && fishConflict(lane, y)) continue;
+      if (type.rule === "avoidLane" && fishConflict(lane, yWorld)) continue;
+
+      const img = type.images[randInt(0, type.images.length - 1)];
 
       obstaclesRef.current.push({
-        id: crypto.randomUUID(),
+        id: makeId(),
         lane,
         x: laneCenters[lane],
-        y,
-        img: type.images[randInt(0, type.images.length - 1)],
+        y: yWorld,
+        img,
         rule: type.rule,
         needAction: type.needAction,
+        typeId, // ✅ сохраняем ключ типа
         passed: false,
       });
+
       return;
     }
   }
 
-  function laneHasEnoughGap(lane, y) {
-    return !obstaclesRef.current.some(
-      (o) => o.lane === lane && Math.abs(o.y - y) < OBSTACLES_CONFIG.SAME_LANE_MIN_GAP_PX
-    );
-  }
-
-  function laneHasEnoughActionSwitchGap(lane, y, type) {
-    if (type.rule !== "needAction") return true;
-    const next = obstaclesRef.current.find(
-      (o) => o.lane === lane && o.y > y
-    );
-    if (!next || next.rule !== "needAction") return true;
-    if (next.needAction === type.needAction) return true;
-    return next.y - y >= OBSTACLES_CONFIG.ACTION_SWITCH_MIN_GAP_PX;
-  }
-
   useEffect(() => {
     if (status !== "running") return;
+
     lastTimeRef.current = 0;
 
-    let raf;
-    function frame(t) {
+    let raf = 0;
+
+    const frame = (t) => {
       if (!lastTimeRef.current) lastTimeRef.current = t;
-      const dy =
-        ((t - lastTimeRef.current) / 1000) *
-        ROAD_SCROLL_SPEED_PX_PER_SEC;
+      const dt = (t - lastTimeRef.current) / 1000;
       lastTimeRef.current = t;
 
-      obstaclesRef.current.forEach((o) => (o.y += dy));
-      obstaclesRef.current = obstaclesRef.current.filter(
-        (o) => o.y < fieldH + 60
-      );
+      const speed = scrollSpeedRef?.current ?? 0;
+      const dy = speed * dt;
+
+      if (!(typeof worldOffsetRef?.current === "number")) {
+        localOffsetRef.current += dy;
+      }
+
+      const offset = getOffsetRenderPx();
+
+      if (hostRef.current) {
+        hostRef.current.style.transform = `translate3d(0px, ${offset}px, 0px)`;
+      }
+
+      const beforeLen = obstaclesRef.current.length;
+      obstaclesRef.current = obstaclesRef.current.filter((o) => o.y + offset < fieldH + 60);
+      const removed = obstaclesRef.current.length !== beforeLen;
 
       nextSpawnPxRef.current -= dy;
+      let spawned = false;
+
       if (nextSpawnPxRef.current <= 0) {
-        spawnAtY(-40);
+        const yWorld = -40 - offset;
+        spawnAtYWorld(yWorld);
+
         nextSpawnPxRef.current = randInt(
           OBSTACLES_CONFIG.SPAWN_GAP_PX.min,
           OBSTACLES_CONFIG.SPAWN_GAP_PX.max
         );
+
+        spawned = true;
       }
+
+      const playerHitY = fieldH - PLAYER_RENDER.GROUND_BOTTOM_PX - 10;
 
       for (const o of obstaclesRef.current) {
         if (o.passed) continue;
-        if (Math.abs(o.y - (fieldH - PLAYER_RENDER.GROUND_BOTTOM_PX - 10)) < OBSTACLES_CONFIG.HIT_WINDOW_PX) {
+
+        const screenY = o.y + offset;
+
+        if (Math.abs(screenY - playerHitY) < OBSTACLES_CONFIG.HIT_WINDOW_PX) {
           if (o.rule === "avoidLane" && o.lane === laneIndex) dispatch(gameOver());
           if (o.rule === "needAction" && o.lane === laneIndex && actionState !== o.needAction)
             dispatch(gameOver());
@@ -158,16 +240,21 @@ export default function ObstacleLayer({
         }
       }
 
-      forceUpdate((x) => x + 1);
+      if (removed || spawned) bumpRender((x) => x + 1);
+
       raf = requestAnimationFrame(frame);
-    }
+    };
 
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [status, fieldH, laneIndex, actionState]);
+  }, [status, fieldH, laneIndex, actionState, scrollSpeedRef, worldOffsetRef, dispatch]);
 
   return (
-    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 6 }}>
+    <div
+      ref={hostRef}
+      className="absolute inset-0 pointer-events-none"
+      style={{ zIndex: 6, willChange: "transform" }}
+    >
       {obstaclesRef.current.map((o) => (
         <ObstacleSprite
           key={o.id}

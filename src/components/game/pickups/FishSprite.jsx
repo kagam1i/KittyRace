@@ -2,12 +2,8 @@
  * FishSprite
  * - позиционирование (x / y)
  * - масштаб
- * - pop при подборе
- * - fade-out при culled (если sidestep "поймал" рыбу уже в кадре)
- *
- * ⚠️ Важно: transform лучше разделять:
- * - внешний div: translate(-50%, -50%) для центрирования
- * - внутренний div: scale + анимации (pop/fade)
+ * - pop при подборе (длительность задаётся снаружи)
+ * - fade-out при culled
  */
 export default function FishSprite({
   src,
@@ -17,6 +13,7 @@ export default function FishSprite({
   scale = 1,
   picked = false,
   culled = false,
+  popDurationMs = 180,
   zIndex = 7,
 }) {
   return (
@@ -35,7 +32,10 @@ export default function FishSprite({
         className={`w-full h-full ${picked ? "fish-pop" : ""} ${
           culled ? "fish-fade" : ""
         }`}
-        style={{ transform: `scale(${scale})` }}
+        style={{
+          transform: `scale(${scale})`,
+          animationDuration: picked ? `${popDurationMs}ms` : undefined,
+        }}
       >
         <img src={src} alt="" className="w-full h-full" draggable={false} />
       </div>

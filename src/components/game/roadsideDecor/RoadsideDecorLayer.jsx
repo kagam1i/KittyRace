@@ -1,4 +1,3 @@
-// src/components/game/roadsideDecor/RoadsideDecorLayer.jsx
 // --------------------------------------------------------
 // Генерация декораций на обочине:
 // - rAF + dt (синхронно с дорогой)
@@ -7,7 +6,7 @@
 // - редкие, но заметные деревья
 // - первичное заполнение всей высоты
 //
-// ✅ Mobile adaptive fix:
+//  Mobile adaptive fix:
 // - на мобилках обочина узкая
 // - если рисовать спрайты с фиксированным ROADSIDE_DECOR.SCALE,
 //   декор начинает вылезать/обрезаться overflow'ом
@@ -62,15 +61,25 @@ function pickCategory() {
 
 export default function RoadsideDecorLayer({
   side,
-  scrollSpeedPxPerSec,
-  shoulderW, // ✅ приходит из TrackShoulders.jsx
+  scrollSpeedRef,
+  status,
+  shoulderW, // приходит из TrackShoulders.jsx
 }) {
   const hostRef = useRef(null);
   const [hostH, setHostH] = useState(0);
   const [hostW, setHostW] = useState(0);
 
   const lastTreeYRef = useRef(null);
-  const [items, setItems] = useState([]);
+
+  // Список декораций храним в ref.
+  // React перерисовываем только когда добавили/удалили элементы.
+  const itemsRef = useRef([]);
+  const [, bumpRender] = useState(0);
+
+  // Общий сдвиг слоя по Y (в пикселях экрана).
+  // Двигаем контейнер transform'ом — это меньше нагружает React
+  // и убирает микродёрганье от setState на каждый кадр.
+  const scrollOffsetRef = useRef(0);
 
   // меряем контейнер (на всякий случай). shoulderW — основной источник ширины.
   useEffect(() => {
@@ -88,7 +97,7 @@ export default function RoadsideDecorLayer({
   }, []);
 
   // -------------------------------------------------------
-  // ✅ Адаптивный scale по ширине обочины
+  // Адаптивный scale по ширине обочины
   // -------------------------------------------------------
   const effectiveShoulderW = useMemo(() => {
     // предпочитаем shoulderW (точнее отражает обочину),
@@ -156,6 +165,11 @@ export default function RoadsideDecorLayer({
   useEffect(() => {
     if (!hostH) return;
 
+    // Первичное заполнение делаем только когда игра реально запущена.
+    // Если заполнить на паузе, а потом начать анимацию, может появиться
+    // резкий первый сдвиг из-за большого dt.
+    if (status !== "running") return;
+
     lastTreeYRef.current = null;
     const start = [];
 
@@ -193,12 +207,19 @@ export default function RoadsideDecorLayer({
       y += nextGapY();
     }
 
-    setItems(start);
-  }, [hostH, side]);
+    itemsRef.current = start;
+    scrollOffsetRef.current = 0;
+    if (hostRef.current) hostRef.current.style.transform = "translate3d(0px, 0px, 0px)";
+    bumpRender((x) => x + 1);
+  }, [hostH, side, status]);
 
   // Game-loop
   useEffect(() => {
     if (!hostH) return;
+
+    // На паузе полностью останавливаем слой, чтобы он не "догонял"
+    // накопившееся время при resume.
+    if (status !== "running") return;
 
     let raf = 0;
     let last = performance.now();
@@ -206,44 +227,70 @@ export default function RoadsideDecorLayer({
     const tick = (ts) => {
       const dt = (ts - last) / 1000;
       last = ts;
-      const dy = scrollSpeedPxPerSec * dt;
+      const speed = scrollSpeedRef?.current ?? 0;
+      const dy = speed * dt;
 
-      setItems((prev) => {
-        const moved = prev.map((it) => ({ ...it, y: it.y + dy }));
-        const alive = moved.filter(
-          (it) => it.y < hostH + ROADSIDE_DECOR.DESPAWN_PADDING_PX
-        );
+      // 1) Накапливаем общий сдвиг слоя.
+      scrollOffsetRef.current += dy;
 
-        const topMost = alive.length
-          ? Math.min(...alive.map((it) => it.y))
-          : 0;
+      // 2) Рисуем слой по целым пикселям.
+      const rounded = Math.round(scrollOffsetRef.current);
+      if (hostRef.current) {
+        hostRef.current.style.transform = `translate3d(0px, ${rounded}px, 0px)`;
+      }
 
-        const gap = nextGapY();
-        if (topMost > -gap && Math.random() < ROADSIDE_DECOR.SMALL_SPAWN_CHANCE) {
-          const newY = topMost - gap;
-          const { type, group } = pickTypeForSpawnY(newY);
-          alive.push(makeItem({ type, y: newY, group }));
-        }
+      // 3) Обслуживание списка (despawn/spawn).
+      //    Сами y у элементов не трогаем — они "приклеены" к обочине.
+      const offset = scrollOffsetRef.current;
+      const beforeLen = itemsRef.current.length;
 
-        return alive;
-      });
+      // убираем то, что ушло ниже экрана
+      itemsRef.current = itemsRef.current.filter(
+        (it) => it.y + offset < hostH + ROADSIDE_DECOR.DESPAWN_PADDING_PX
+      );
+
+      // screenY верхнего элемента
+      const topMostScreenY = itemsRef.current.length
+        ? Math.min(...itemsRef.current.map((it) => it.y + offset))
+        : 0;
+
+      const gap = nextGapY();
+      if (
+        topMostScreenY > -gap &&
+        Math.random() < ROADSIDE_DECOR.SMALL_SPAWN_CHANCE
+      ) {
+        // хотим новый элемент на экране на позиции (topMostScreenY - gap)
+        const newScreenY = topMostScreenY - gap;
+        const baseY = newScreenY - offset;
+
+        const { type, group } = pickTypeForSpawnY(baseY);
+        itemsRef.current.push(makeItem({ type, y: baseY, group }));
+      }
+
+      if (itemsRef.current.length !== beforeLen) {
+        bumpRender((x) => x + 1);
+      }
 
       raf = requestAnimationFrame(tick);
     };
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [hostH, scrollSpeedPxPerSec, side]);
+  }, [hostH, status, scrollSpeedRef, side]);
 
   return (
-    <div ref={hostRef} className="absolute inset-0 pointer-events-none">
-      {items.map((it) => (
+    <div
+      ref={hostRef}
+      className="absolute inset-0 pointer-events-none"
+      style={{ willChange: "transform" }}
+    >
+      {itemsRef.current.map((it) => (
         <DecorSprite
           key={it.id}
           type={it.type}
           xPercent={it.xPercent}
           yPx={it.y}
-          // ✅ вот он: scale под ширину обочины
+          // вот он: scale под ширину обочины
           scale={getMaxScaleForType(it.type)}
         />
       ))}
