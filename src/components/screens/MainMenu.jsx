@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { startGame, selectCat, buyCat } from "../../features/game/gameSlice";
 import { toggleSound } from "../../features/settings/settingsSlice";
@@ -37,7 +37,11 @@ export function MainMenu() {
   const soundEnabled = useSelector((s) => s.settings.soundEnabled);
 
   const walletFish = useSelector((s) => s.game.walletFish);
+
   const unlockedCats = useSelector((s) => s.game.unlockedCats);
+
+  const lastRunFish = useSelector((s) => s.game.lastRunFish);
+
 
 
   const initialIndex = useMemo(() => {
@@ -46,6 +50,17 @@ export function MainMenu() {
   }, [selectedCatId]);
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [popFish, setPopFish] = useState(false);
+
+
+  useEffect(() => {
+    if (lastRunFish > 0) {
+      setPopFish(true);
+      const t = setTimeout(() => setPopFish(false), 520);
+      return () => clearTimeout(t);
+    }
+  }, [lastRunFish]);
+
 
   const currentCat = CATS[wrapIndex(currentIndex, CATS.length)];
   const previewSrc = CAT_PREVIEW_BY_ID[currentCat.id];
@@ -102,7 +117,8 @@ export function MainMenu() {
 
           {/* Fish bank pinned (stable offsets) */}
           <div className="absolute top-6 right-6 ui-fade-in ui-delay-1">
-            <div className="ui-icon-chip">
+            <div className={`ui-icon-chip ${popFish ? "wallet-pop" : ""}`}>
+
               <img
                 src={fishIcon}
                 alt="Fish"

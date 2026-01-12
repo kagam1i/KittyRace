@@ -52,6 +52,34 @@
       transform: scale(1);
     }
   }
+
+  .wallet-pop {
+    animation: walletPop 520ms cubic-bezier(0.22, 1, 0.36, 1);
+    transform-origin: center;
+  }
+
+  @keyframes walletPop {
+    0% {
+      transform: translateY(0) scale(1);
+      filter: brightness(1);
+    }
+
+    30% {
+      transform: translateY(-3px) scale(1.28);
+      filter: brightness(1.12);
+    }
+
+    55% {
+      transform: translateY(1px) scale(1.12);
+      filter: brightness(1.05);
+    }
+
+    100% {
+      transform: translateY(0) scale(1);
+      filter: brightness(1);
+    }
+  }
+
 }
 
 /* ================== COMPONENTS — Cozy Pixel UI =========================== */
