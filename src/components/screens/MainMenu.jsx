@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { startGame, selectCat } from "../../features/game/gameSlice";
 import { toggleSound } from "../../features/settings/settingsSlice";
@@ -5,21 +6,29 @@ import { CATS } from "../../features/game/cats";
 
 import backgroundImg from "../../assets/background.png";
 
-// Превью котиков для карточек
+// previews
 import miloPreview from "../../assets/sprites/preview/milo.png";
 import brunoPreview from "../../assets/sprites/preview/bruno.png";
 import lunaPreview from "../../assets/sprites/preview/luna.png";
 
-// Иконки звука
+// sound
 import soundOnIcon from "../../assets/sound/sound_on.png";
 import soundOffIcon from "../../assets/sound/sound_off.png";
 
-// Карта: id кота -> картинка превью
+// fish
+import fishIcon from "../../assets/environment/fish.png";
+
+import CatCarouselCard from "./CatCarouselCard";
+
 const CAT_PREVIEW_BY_ID = {
   milo: miloPreview,
   bruno: brunoPreview,
   luna: lunaPreview,
 };
+
+function wrapIndex(idx, n) {
+  return ((idx % n) + n) % n;
+}
 
 export function MainMenu() {
   const dispatch = useDispatch();
@@ -27,10 +36,36 @@ export function MainMenu() {
   const selectedCatId = useSelector((s) => s.game.selectedCatId);
   const soundEnabled = useSelector((s) => s.settings.soundEnabled);
 
+  // Step A — UI only
+  const walletFish = 0;
+
+  const initialIndex = useMemo(() => {
+    const i = CATS.findIndex((c) => c.id === selectedCatId);
+    return i >= 0 ? i : 0;
+  }, [selectedCatId]);
+
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+
+  const currentCat = CATS[wrapIndex(currentIndex, CATS.length)];
+  const previewSrc = CAT_PREVIEW_BY_ID[currentCat.id];
+
+  const isUnlocked = currentCat.id === "milo";
+  const price = currentCat.costFish ?? 0;
+  const canBuy = !isUnlocked && walletFish >= price;
+
+  const goPrev = () => setCurrentIndex((i) => wrapIndex(i - 1, CATS.length));
+  const goNext = () => setCurrentIndex((i) => wrapIndex(i + 1, CATS.length));
+
+  const onStart = () => {
+    if (!isUnlocked) return;
+    dispatch(selectCat(currentCat.id));
+    dispatch(startGame());
+  };
+
   return (
     <div className="min-h-screen grid place-items-center p-6 bg-bg">
       <div
-        className="ui-panel w-[min(520px,92vw)] p-6 relative overflow-hidden"
+        className="ui-panel w-[min(760px,92vw)] relative overflow-hidden"
         style={{
           backgroundImage: `url(${backgroundImg})`,
           backgroundRepeat: "no-repeat",
@@ -39,23 +74,18 @@ export function MainMenu() {
           imageRendering: "pixelated",
         }}
       >
-        {/* облачный параллакс */}
+        {/* clouds */}
         <div
           className="ui-menu-clouds pointer-events-none"
           style={{ backgroundImage: `url(${backgroundImg})` }}
         />
-
-        {/* лёгкая “вуаль”, чтобы UI читался */}
         <div className="absolute inset-0 bg-white/40 pointer-events-none" />
 
-        <div className="relative">
-          <div
-            className="ui-fade-in ui-delay-1 grid items-center"
-            style={{ gridTemplateColumns: "48px 1fr 48px" }}
-          >
-            {/* левая колонка */}
+        <div className="relative min-h-[520px]">
+          {/* Sound pinned (stable offsets) */}
+          <div className="absolute top-6 left-6 ui-fade-in ui-delay-1">
             <button
-              className="ui-icon-btn justify-self-start"
+              className="ui-icon-btn"
               onClick={() => dispatch(toggleSound())}
               aria-label={soundEnabled ? "Sound on" : "Sound off"}
             >
@@ -66,59 +96,69 @@ export function MainMenu() {
                 draggable="false"
               />
             </button>
-
-            {/* центр */}
-            <h1 className="ui-title text-center">Kitty race</h1>
-
-            {/* правая колонка — пустая, но той же ширины */}
-            <div />
           </div>
 
-          <div
-            className="mt-10 grid place-items-center ui-fade-in ui-delay-2"
-          >
-            <button
-              className="ui-btn-primary px-10 py-3 text-lg"
-              onClick={() => dispatch(startGame())}
-            >
-              Start
-            </button>
+          {/* Fish bank pinned (stable offsets) */}
+          <div className="absolute top-6 right-6 ui-fade-in ui-delay-1">
+            <div className="ui-icon-chip">
+              <img
+                src={fishIcon}
+                alt="Fish"
+                className="pixelated w-8 h-8"
+                draggable="false"
+              />
+              <span className="ui-icon-chip__count">{walletFish}</span>
+            </div>
           </div>
 
-          {/* Выбор котика в одну линию */}
-          <div
-            className="mt-8 flex justify-center gap-4 flex-wrap ui-fade-in ui-delay-3"
-          >
-            {CATS.map((cat) => {
-              const previewSrc = CAT_PREVIEW_BY_ID[cat.id];
-              const isActive = cat.id === selectedCatId;
+          {/* Top center (fixed, does NOT depend on card height) */}
+          <div className="absolute inset-x-0 top-6 flex flex-col items-center pointer-events-none">
+            <h1 className="ui-title ui-fade-in ui-delay-1 text-center pointer-events-none">
+              KITTY RACE
+            </h1>
 
-              return (
-                <button
-                  key={cat.id}
-                  className={`ui-cat-card ${isActive ? "is-active" : ""}`}
-                  onClick={() => dispatch(selectCat(cat.id))}
-                >
-                  {/* Бейдж выбора */}
-                  {isActive && (
-                    <div className="ui-cat-card__badge">Selected</div>
-                  )}
+            {/* fixed spacing between title and start */}
+            <div className="h-10" />
 
-                  {/* Картинка превью */}
-                  <div
-                    className="ui-cat-card__img"
-                    style={{ backgroundImage: `url(${previewSrc})` }}
-                    aria-label={cat.name}
-                  />
-
-                  {/* Подпись снизу */}
-                  <div className="ui-cat-card__label">{cat.id}</div>
-                </button>
-              );
-            })}
+            <div className="ui-fade-in ui-delay-2 pointer-events-auto">
+              <button
+                className="ui-btn-primary-pixel px-10 py-3 text-lg"
+                onClick={onStart}
+                title={!isUnlocked ? "Cat is locked" : "Start"}
+              >
+                START
+              </button>
+            </div>
           </div>
+
+          {/* Card area (free to grow; start will never move) */}
+          <div className="absolute inset-x-0 top-[210px]">
+            <div className="w-full px-6 ui-fade-in ui-delay-3 translate-y-[10px]">
+              <CatCarouselCard
+                cat={currentCat}
+                previewSrc={previewSrc}
+                isUnlocked={isUnlocked}
+                price={price}
+                canBuy={canBuy}
+                fishIcon={fishIcon}
+                onPrev={goPrev}
+                onNext={goNext}
+                onBuy={() => { }}
+              />
+
+              {/* keep exactly as you asked */}
+              <div className="mt-4 text-center text-xs opacity-70">
+                Use arrows to choose a cat. Press START to play as the selected cat.
+              </div>
+            </div>
+          </div>
+
+
+
         </div>
       </div>
     </div>
   );
 }
+
+export default MainMenu;

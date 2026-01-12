@@ -26,6 +26,15 @@
       2px 2px 0 rgba(0, 0, 0, 0.18);
   }
 
+  .pixel-text-readable {
+    text-shadow:
+      1px 1px 0 rgba(255, 255, 255, 0.75),
+      -1px 1px 0 rgba(255, 255, 255, 0.55),
+      1px -1px 0 rgba(255, 255, 255, 0.55),
+      -1px -1px 0 rgba(255, 255, 255, 0.55),
+      0 2px 0 rgba(47, 62, 54, 0.18);
+  }
+
   .fish-pop {
     animation: fishPop 170ms ease-out;
   }
@@ -215,6 +224,32 @@
       inset 0 -1px 0 rgba(18, 28, 24, 0.10);
   }
 
+  /* NEW: pixel outline variant for primary button (START) */
+  .ui-btn-primary-pixel {
+    @apply ui-btn-primary;
+    position: relative;
+  }
+
+  /* pseudo pixel frame (double outline effect) */
+  .ui-btn-primary-pixel::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    /* outer frame */
+    border: 1px solid rgba(47, 58, 46, 0.32);
+    pointer-events: none;
+  }
+
+  .ui-btn-primary-pixel::after {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    /* inner frame */
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    pointer-events: none;
+  }
+
+
   .ui-btn-accent {
     @apply ui-btn;
 
@@ -271,6 +306,82 @@
       0 3px 0 rgba(18, 28, 24, 0.12),
       inset 0 1px 0 rgba(255, 255, 255, 0.75);
   }
+
+  /* NEW: arrow button (pixel, symmetric, slightly bigger hitbox) */
+  .ui-arrow-btn {
+    @apply ui-btn-ghost grid place-items-center select-none;
+    width: 52px;
+    height: 52px;
+    padding: 0;
+    border-radius: 0;
+
+    background:
+      linear-gradient(to bottom,
+        rgba(255, 255, 255, 0.70),
+        rgba(255, 255, 255, 0.20)),
+      rgba(255, 255, 255, 0.70);
+
+    border: 1px solid rgba(47, 58, 46, 0.28);
+
+    box-shadow:
+      0 0 0 1px rgba(40, 55, 45, 0.10),
+      0 3px 0 rgba(18, 28, 24, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.75);
+
+    /* keep "button feel" but subtle */
+    transition: transform 120ms ease, filter 120ms ease;
+  }
+
+  .ui-arrow-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.02);
+  }
+
+  .ui-arrow-btn:active {
+    transform: translateY(1px);
+    filter: brightness(0.99);
+  }
+
+
+  /* NEW: static icon + number (no hover, no press) */
+  .ui-icon-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    height: 44px;
+    padding: 0 12px;
+    border-radius: 0;
+
+    font-size: 14px;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+
+    background:
+      linear-gradient(to bottom,
+        rgba(255, 255, 255, 0.70),
+        rgba(255, 255, 255, 0.20)),
+      rgba(255, 255, 255, 0.75);
+
+    border: 1px solid rgba(47, 58, 46, 0.28);
+
+    box-shadow:
+      0 0 0 1px rgba(40, 55, 45, 0.10),
+      0 3px 0 rgba(18, 28, 24, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.75);
+
+    /* IMPORTANT: no interaction */
+    pointer-events: none;
+  }
+
+  .ui-icon-chip__count {
+    font-weight: 700;
+    line-height: 1;
+    color: rgba(47, 58, 46, 0.95);
+  }
+
+
 
   /* -------------------- Chip --------------------------- */
   .ui-chip {
