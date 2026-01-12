@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { startGame, selectCat } from "../../features/game/gameSlice";
+import { startGame, selectCat, buyCat } from "../../features/game/gameSlice";
 import { toggleSound } from "../../features/settings/settingsSlice";
 import { CATS } from "../../features/game/cats";
 
@@ -36,8 +36,9 @@ export function MainMenu() {
   const selectedCatId = useSelector((s) => s.game.selectedCatId);
   const soundEnabled = useSelector((s) => s.settings.soundEnabled);
 
-  // Step A — UI only
-  const walletFish = 0;
+  const walletFish = useSelector((s) => s.game.walletFish);
+  const unlockedCats = useSelector((s) => s.game.unlockedCats);
+
 
   const initialIndex = useMemo(() => {
     const i = CATS.findIndex((c) => c.id === selectedCatId);
@@ -49,7 +50,8 @@ export function MainMenu() {
   const currentCat = CATS[wrapIndex(currentIndex, CATS.length)];
   const previewSrc = CAT_PREVIEW_BY_ID[currentCat.id];
 
-  const isUnlocked = currentCat.id === "milo";
+  const isUnlocked = unlockedCats.includes(currentCat.id);
+
   const price = currentCat.costFish ?? 0;
   const canBuy = !isUnlocked && walletFish >= price;
 
@@ -143,7 +145,14 @@ export function MainMenu() {
                 fishIcon={fishIcon}
                 onPrev={goPrev}
                 onNext={goNext}
-                onBuy={() => { }}
+                onBuy={() => {
+                  dispatch(
+                    buyCat({
+                      catId: currentCat.id,
+                      cost: price,
+                    })
+                  );
+                }}
               />
 
               {/* keep exactly as you asked */}

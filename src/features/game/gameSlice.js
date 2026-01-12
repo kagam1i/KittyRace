@@ -6,7 +6,14 @@ const initialState = {
   laneIndex: 2, // текущая полоса 0|1|2|3|4
   actionState: "run", // run|jump|slide
   selectedCatId: "milo", // milo|bruno|luna
-  fishCount: 0, // количество собранных рыбок
+
+  fishCount: 0, // количество собранных рыбок за ТЕКУЩИЙ забег
+  lastRunFish: 0, // сколько рыб было собрано в прошлом забеге (для GameOver)
+
+  // === ШАГ B =====================================================
+  walletFish: 0, // общий банк накопленных рыбок (между забегами)
+  unlockedCats: ["milo"], // разблокированные коты
+
   runId: 0, // идентификатор забега (меняется только на start/restart)
 };
 
@@ -22,8 +29,9 @@ const gameSlice = createSlice({
       state.laneIndex = 2;
       state.actionState = "run";
 
-      // Сброс счётчика
+      // Сброс счётчиков
       state.fishCount = 0;
+      state.lastRunFish = 0;
 
       state.runId += 1;
     },
@@ -41,7 +49,19 @@ const gameSlice = createSlice({
     },
 
     gameOver(state) {
+      // защита от повторных вызовов (коллизия может срабатывать каждый кадр)
+      if (state.status === "gameover") return;
+
       state.status = "gameover";
+
+      // При проигрыше сохраняем результат забега для экрана GameOver
+      state.lastRunFish = state.fishCount;
+
+      // При проигрыше переносим рыбы из забега в общий банк
+      if (state.fishCount > 0) {
+        state.walletFish += state.fishCount;
+        state.fishCount = 0;
+      }
     },
 
     moveLeft(state) {
@@ -69,8 +89,33 @@ const gameSlice = createSlice({
     },
 
     addFish(state, action) {
+      // Добавление рыбок ВО ВРЕМЯ ЗАБЕГА
       const amount = action.payload ?? 1;
       state.fishCount += amount;
+    },
+
+    // === ШАГ B ===================================================
+    buyCat(state, action) {
+      const { catId, cost } = action.payload;
+
+      if (!catId) return;
+      if (state.unlockedCats.includes(catId)) return;
+
+      if (state.walletFish >= cost) {
+        state.walletFish -= cost;
+        state.unlockedCats.push(catId);
+      }
+    },
+
+    // === ШАГ B.2 (Persist) ======================================
+    // Мягко применяем сохранённые значения, не ломая остальной state
+    applyPersist(state, action) {
+      const p = action.payload || {};
+
+      if (typeof p.walletFish === "number") state.walletFish = p.walletFish;
+      if (Array.isArray(p.unlockedCats)) state.unlockedCats = p.unlockedCats;
+      if (typeof p.selectedCatId === "string")
+        state.selectedCatId = p.selectedCatId;
     },
   },
 });
@@ -88,6 +133,8 @@ export const {
   setSlide,
   selectCat,
   addFish,
+  buyCat,
+  applyPersist, // ← для store.js
 } = gameSlice.actions;
 
 export default gameSlice.reducer;

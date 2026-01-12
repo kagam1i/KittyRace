@@ -95,11 +95,7 @@ export default function CatCarouselCard({
                                     className="ui-btn px-7 py-2"
                                     disabled={!canBuy}
                                     onClick={onBuy}
-                                    title={
-                                        canBuy
-                                            ? "Buy (will be implemented on Step B)"
-                                            : "Not enough fish (wallet comes on Step B)"
-                                    }
+                                    title={canBuy ? "Buy" : "Not enough fish"}
                                 >
                                     BUY
                                 </button>

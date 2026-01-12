@@ -15,8 +15,10 @@ import fishIcon from "../../assets/environment/fish.png";
 export function GameOverMenu() {
   const dispatch = useDispatch();
 
-  // собранные рыбы за попытку
-  const fishCount = useSelector((s) => s.game.fishCount ?? 0);
+
+  const lastRunFish = useSelector((s) => s.game.lastRunFish ?? 0);
+
+
 
   return (
     <div className="min-h-screen grid place-items-center p-6 bg-bg">
@@ -50,7 +52,7 @@ export function GameOverMenu() {
           {/* Рыбы, собранные за попытку */}
           <div className="mt-6 flex items-center justify-center gap-3">
             <img src={fishIcon} alt="fish" className="w-8 h-8 pixelated" />
-            <div className="ui-chip">{fishCount}</div>
+            <div className="ui-chip">{lastRunFish}</div>
           </div>
 
           <div className="mt-10 grid gap-4 place-items-center">
