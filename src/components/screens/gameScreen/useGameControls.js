@@ -53,6 +53,8 @@ export function useGameControls(targetRef) {
       const isSlideKey = key === "ArrowDown" || key === "s" || key === "ы";
 
       const currentAction = actionStateRef.current;
+
+      // jump/slide запускается только если сейчас run
       if ((isJumpKey || isSlideKey) && currentAction !== "run") return;
 
       if (isJumpKey) {
@@ -71,11 +73,10 @@ export function useGameControls(targetRef) {
         clearActionTimeout();
         dispatch(setSlide());
 
-        // ✅ slide НЕ ТРОГАЕМ: оставляем как было
         actionTimeoutRef.current = setTimeout(() => {
           dispatch(setRun());
           actionTimeoutRef.current = null;
-        }, 550);
+        }, PLAYER_MOTION.SLIDE_DURATION_MS);
 
         return;
       }
@@ -130,11 +131,10 @@ export function useGameControls(targetRef) {
       clearActionTimeout();
       dispatch(setSlide());
 
-      // ✅ slide НЕ ТРОГАЕМ
       actionTimeoutRef.current = setTimeout(() => {
         dispatch(setRun());
         actionTimeoutRef.current = null;
-      }, 550);
+      }, PLAYER_MOTION.SLIDE_DURATION_MS);
     }
 
     function onPointerDown(e) {
@@ -162,8 +162,8 @@ export function useGameControls(targetRef) {
 
       const absX = Math.abs(dx);
       const absY = Math.abs(dy);
-      const isSwipe = Math.max(absX, absY) >= SWIPE_MIN_PX;
-      if (!isSwipe) return;
+
+      if (Math.max(absX, absY) < SWIPE_MIN_PX) return;
 
       if (absX > absY) {
         if (dx < 0) dispatch(moveLeft());

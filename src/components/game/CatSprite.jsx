@@ -8,8 +8,7 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
   const frameW = CAT_SHEET.FRAME_W;
   const frameH = CAT_SHEET.FRAME_H;
 
-  const scale = CAT_SHEET.SCALE_OPTIONS[0]; // 2
-
+  const scale = CAT_SHEET.SCALE_OPTIONS[0]; // 2x
   const rowIndex = CAT_ROW_BY_ID[catId] ?? 0;
 
   const anim = useMemo(() => {
@@ -25,8 +24,10 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
     img.onload = () => setSheetSize({ w: img.width, h: img.height });
   }, []);
 
-  // run крутится, jump/slide проигрываются 1 раз (но для jump кадр задаём фазой)
   useEffect(() => {
+    // ✅ jump кадры берём из фазы, а не из интервала
+    if (actionState === "jump") return;
+
     setLocalFrame(0);
 
     const isLooping = actionState === "run";
@@ -44,14 +45,14 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
 
   if (sheetSize.w === 0 || sheetSize.h === 0) return null;
 
+  // --- выбор кадра ---
   let sheetFrameIndex = anim.start + localFrame;
 
-  // ✅ Прыжок: кадр зависит от фазы полёта
+  // ✅ jump: 4/5/6 по фазам полёта
   if (actionState === "jump") {
-    if (jumpPhase === "up") sheetFrameIndex = anim.start + 0; // кадр 4
-    else if (jumpPhase === "apex") sheetFrameIndex = anim.start + 1; // кадр 5
-    else if (jumpPhase === "down") sheetFrameIndex = anim.start + 2; // кадр 6
-    else sheetFrameIndex = anim.start + localFrame;
+    if (jumpPhase === "apex") sheetFrameIndex = 5;
+    else if (jumpPhase === "down") sheetFrameIndex = 6;
+    else sheetFrameIndex = 4; // "up" или null
   }
 
   const frameX = sheetFrameIndex * frameW;
