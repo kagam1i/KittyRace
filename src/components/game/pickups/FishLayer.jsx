@@ -7,6 +7,8 @@ import { FISH_CONFIG } from "./fish.config";
 import { addFish } from "../../../features/game/gameSlice";
 import { PLAYER_RENDER } from "../../../config/playerRender";
 
+import { getObstacleBoundsPx } from "../obstacles/obstacleBounds";
+
 function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -25,7 +27,7 @@ export default function FishLayer({
   fieldH,
   scrollSpeedRef,
   worldOffsetRef,
-  getObstacles,
+  getObstacles, // должен вернуть массив obstacle snapshot (y = screenY)
   setFishSnapshotGetter,
 }) {
   const dispatch = useDispatch();
@@ -55,7 +57,7 @@ export default function FishLayer({
       FISH_CONFIG.SPAWN_GAP_PX.max
     );
 
-    if (hostRef.current) hostRef.current.style.transform = "translate3d(0px, 0px, 0px)";
+    if (hostRef.current) hostRef.current.style.transform = "translate3d(0px,0px,0px)";
     bumpRender((x) => x + 1);
   }, [runId]);
 
@@ -68,13 +70,25 @@ export default function FishLayer({
     return Math.round(getOffsetFloat());
   }
 
+  function getObstaclesSafe() {
+    const raw = typeof getObstacles === "function" ? getObstacles() : [];
+    return Array.isArray(raw) ? raw : [];
+  }
+
   useEffect(() => {
     if (!setFishSnapshotGetter) return;
 
+    // ✅ наружу отдаём screenY, чтобы ObstacleLayer мог корректно проверять конфликты
     setFishSnapshotGetter(() => {
       return () => {
         const offset = getOffsetRenderPx();
-        return fishRef.current.map((f) => ({ ...f, y: f.y + offset }));
+        return fishRef.current.map((f) => ({
+          id: f.id,
+          lane: f.lane,
+          y: f.y + offset, // screenY
+          picked: f.picked,
+          hidden: f.hidden,
+        }));
       };
     });
 
@@ -89,28 +103,28 @@ export default function FishLayer({
     [laneW]
   );
 
-  const maxFishScale = useMemo(() => {
+  const fishScale = useMemo(() => {
     const s = (laneW * 0.85) / FISH_CONFIG.SIZE_PX;
-    return Math.max(0.85, Math.min(FISH_CONFIG.SCALE, s));
+    return clamp(s, 0.85, FISH_CONFIG.SCALE);
   }, [laneW]);
 
-  const pickupY = useMemo(
-    () => fieldH - PLAYER_RENDER.GROUND_BOTTOM_PX - 10,
-    [fieldH]
-  );
+  // gap для sidestep-блокировки (как “воздух”)
+  const screenType = useMemo(() => {
+    const bp = FISH_CONFIG.SCREEN_BREAKPOINTS_PX ?? { mobileMax: 479, tabletMax: 899 };
+    if (fieldW <= bp.mobileMax) return "mobile";
+    if (fieldW <= bp.tabletMax) return "tablet";
+    return "desktop";
+  }, [fieldW]);
 
-  const PREHIDE_WINDOW_PX = 520;
+  const FISH_SIDESTEP_GAP_PX = useMemo(() => {
+    const map = FISH_CONFIG.SIDESTEP_GAP_PX_BY_SCREEN ?? { desktop: 6, tablet: 5, mobile: 4 };
+    return map[screenType] ?? map.desktop ?? 6;
+  }, [screenType]);
+
+  const pickupY = fieldH - PLAYER_RENDER.GROUND_BOTTOM_PX - 10;
 
   const POP_BASE_MS = 180;
   const POP_BASE_SPEED = 140;
-
-  // ✅ пиксельный “зазор безопасности”, чтобы рыба никогда не касалась sidestep
-  const SAFE_MARGIN_PX = 6;
-
-  function getObstaclesSafe() {
-    const raw = typeof getObstacles === "function" ? getObstacles() : [];
-    return Array.isArray(raw) ? raw : [];
-  }
 
   function computePopDurationMs() {
     const speed = scrollSpeedRef?.current ?? 0;
@@ -118,76 +132,90 @@ export default function FishLayer({
     return Math.round(POP_BASE_MS / mult);
   }
 
-  // ✅ Проверка “рыба пересекается с sidestep по прямоугольникам”
-  // Мы работаем в экранных координатах.
-  function fishOverlapsSidestep(lane, fishScreenY) {
-    // Размер рыбы по высоте в пикселях экрана
-    const fishH = FISH_CONFIG.SIZE_PX * maxFishScale;
-    const fishTop = fishScreenY - fishH / 2;
-    const fishBot = fishScreenY + fishH / 2;
+  const SIDESTEP_LANE_RADIUS = 1;
 
-    // Размер sidestep по высоте.
-    // У препятствий у тебя обычно scale = OBSTACLES_CONFIG.SCALE (2),
-    // а base size = 32. Это даёт ~64px высоты.
-    // Если потом поменяешь scale — всё равно будет работать.
-    const SIDESTEP_BASE_SIZE_PX = 32;
-    const SIDESTEP_SCALE = 2;
-    const sidestepH = SIDESTEP_BASE_SIZE_PX * SIDESTEP_SCALE;
+  function fishBlockedBySidestep(fishLane, fishScreenY) {
+    const fishSize = FISH_CONFIG.SIZE_PX * fishScale;
+    const fishHalf = fishSize / 2;
 
-    const list = getObstaclesSafe();
+    const fishTop = fishScreenY - fishHalf;
+    const fishBot = fishScreenY + fishHalf;
 
-    for (const o of list) {
-      if (!o) continue;
-      if (o.lane !== lane) continue;
-      if (o.typeId !== "sidestep") continue;
+    const gap = FISH_SIDESTEP_GAP_PX;
 
-      const sY = o.y; // уже screenY из snapshot
-      const sTop = sY - sidestepH / 2;
-      const sBot = sY + sidestepH / 2;
+    for (const o of getObstaclesSafe()) {
+      if (!o || o.typeId !== "sidestep") continue;
 
-      // расширяем прямоугольник sidestep на SAFE_MARGIN_PX
-      const sTopSafe = sTop - SAFE_MARGIN_PX;
-      const sBotSafe = sBot + SAFE_MARGIN_PX;
+      const obsLane = o.lane ?? 0;
+      if (Math.abs(fishLane - obsLane) > SIDESTEP_LANE_RADIUS) continue;
 
-      const intersects = fishBot > sTopSafe && fishTop < sBotSafe;
-      if (intersects) return true;
+      const sY = o.y; // ✅ это уже screenY (контракт снапшота)
+      if (typeof sY !== "number") continue;
+
+      const b = getObstacleBoundsPx({
+        typeId: o.typeId,
+        laneW,
+        yPx: sY,
+      });
+
+      const top = Math.round(b.top) - gap;
+      const bottom = Math.round(b.bottom) + gap;
+
+      if (fishBot > top && fishTop < bottom) return true;
     }
 
     return false;
   }
 
+  // Мягкая страховка: если рыба ещё ВЫШЕ экрана и пересекается с sidestep — просто прячем
+  function cullInvisibleConflicts(offsetFloat) {
+    const topVisible = -40;
+    let changed = false;
+
+    for (const f of fishRef.current) {
+      if (!f || f.hidden || f.picked) continue;
+
+      const fishScreenY = f.y + offsetFloat;
+
+      if (fishScreenY > topVisible) continue; // в кадре/почти в кадре — не трогаем
+      if (!fishBlockedBySidestep(f.lane, fishScreenY)) continue;
+
+      f.hidden = true;
+      changed = true;
+    }
+
+    return changed;
+  }
+
   function spawnFish(yWorld) {
-    const offset = getOffsetRenderPx();
+    const offsetFloat = getOffsetFloat();
 
     for (let i = 0; i < 18; i++) {
       const lane = randInt(0, 4);
-      const fishScreenY = yWorld + offset;
+      const fishScreenY = yWorld + offsetFloat;
 
-      // ✅ точный геометрический запрет: не пересекаемся с sidestep
-      if (fishOverlapsSidestep(lane, fishScreenY)) continue;
+      if (fishBlockedBySidestep(lane, fishScreenY)) continue;
 
       fishRef.current.push({
         id: makeId(),
         lane,
         x: laneCenters[lane],
         y: yWorld,
-
         picked: false,
         pickedAtMs: 0,
         popDurationMs: POP_BASE_MS,
-
         hidden: false,
       });
+
       return;
     }
   }
 
   function prewarm() {
-    const offset = getOffsetRenderPx();
+    const offsetFloat = getOffsetFloat();
     for (let i = 0; i < 5; i++) {
       const screenY = -60 - i * 120;
-      const yWorld = screenY - offset;
-      spawnFish(yWorld);
+      spawnFish(screenY - offsetFloat);
     }
     nextSpawnPxRef.current = randInt(80, 140);
   }
@@ -208,37 +236,27 @@ export default function FishLayer({
       const speed = scrollSpeedRef?.current ?? 0;
       const dy = speed * dt;
 
-      if (!(typeof worldOffsetRef?.current === "number")) {
+      if (typeof worldOffsetRef?.current !== "number") {
         localOffsetRef.current += dy;
       }
 
-      const offset = getOffsetRenderPx();
+      const offsetFloat = getOffsetFloat();
+      const offsetPx = Math.round(offsetFloat);
 
       if (hostRef.current) {
-        hostRef.current.style.transform = `translate3d(0px, ${offset}px, 0px)`;
+        hostRef.current.style.transform = `translate3d(0px, ${offsetPx}px, 0px)`;
       }
 
       let mutated = false;
 
-      // prehide: если рыба ещё выше кадра, но она бы пересеклась с sidestep — прячем
-      fishRef.current = fishRef.current.map((f) => {
-        if (f.hidden || f.picked) return f;
-
-        const fishScreenY = f.y + offset;
-
-        if (fishScreenY < 0 && fishOverlapsSidestep(f.lane, fishScreenY)) {
-          mutated = true;
-          return { ...f, hidden: true };
-        }
-
-        return f;
-      });
+      // ✅ мягкая страховка, пока рыбы ещё не в кадре
+      if (cullInvisibleConflicts(offsetFloat)) mutated = true;
 
       // pickup
       for (const f of fishRef.current) {
         if (f.hidden || f.picked) continue;
 
-        const screenY = f.y + offset;
+        const screenY = f.y + offsetFloat;
 
         if (
           Math.abs(screenY - pickupY) < FISH_CONFIG.PICKUP_WINDOW_PX &&
@@ -253,24 +271,19 @@ export default function FishLayer({
         }
       }
 
-      // remove: исчезновение ровно по длительности pop
+      // remove
       const beforeLen = fishRef.current.length;
       fishRef.current = fishRef.current.filter((f) => {
         if (f.hidden) return false;
-
-        if (f.picked) {
-          const aliveMs = t - (f.pickedAtMs || 0);
-          return aliveMs < (f.popDurationMs || POP_BASE_MS);
-        }
-
-        return f.y + offset < fieldH + 60;
+        if (f.picked) return t - f.pickedAtMs < f.popDurationMs;
+        return f.y + offsetFloat < fieldH + 60;
       });
+      if (fishRef.current.length !== beforeLen) mutated = true;
 
       // spawn
       nextSpawnPxRef.current -= dy;
       if (nextSpawnPxRef.current <= 0) {
-        spawnFish(-40 - offset);
-
+        spawnFish(-40 - offsetFloat);
         nextSpawnPxRef.current = randInt(
           FISH_CONFIG.SPAWN_GAP_PX.min,
           FISH_CONFIG.SPAWN_GAP_PX.max
@@ -278,27 +291,14 @@ export default function FishLayer({
         mutated = true;
       }
 
-      if (mutated || fishRef.current.length !== beforeLen) {
-        bumpRender((x) => x + 1);
-      }
+      if (mutated) bumpRender((x) => x + 1);
 
       raf = requestAnimationFrame(frame);
     }
 
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [
-    status,
-    fieldH,
-    laneIndex,
-    laneCenters,
-    pickupY,
-    dispatch,
-    getObstacles,
-    scrollSpeedRef,
-    worldOffsetRef,
-    maxFishScale,
-  ]);
+  }, [status, laneIndex, fieldH, laneW, fishScale, laneCenters, FISH_SIDESTEP_GAP_PX]);
 
   return (
     <div
@@ -313,10 +313,10 @@ export default function FishLayer({
           x={f.x}
           y={f.y}
           sizePx={FISH_CONFIG.SIZE_PX}
-          scale={maxFishScale}
+          scale={fishScale}
           picked={f.picked}
           culled={f.hidden}
-          popDurationMs={f.popDurationMs || 180}
+          popDurationMs={f.popDurationMs}
         />
       ))}
     </div>

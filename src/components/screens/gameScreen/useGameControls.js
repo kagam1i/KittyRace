@@ -1,15 +1,3 @@
-// Хук для подключения управления клавиатурой
-
-// Правила управления:
-// - Left/Right (← → или A/D) — смена полосы
-// - Up (↑ или W) — jump (только из run)
-// - Down (↓ или S) — slide (только из run)
-// - Escape — pause
-
-
-// чтобы не спамить jump/slide,
-// мы читаем актуальный actionState через ref.
-
 import { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -22,24 +10,8 @@ import {
   setRun,
 } from "../../../features/game/gameSlice";
 
-/**
- * useGameControls
- *
- * Desktop:
- * - Left/Right (← → или A/D) — смена полосы
- * - Up (↑ или W) — jump (только из run)
- * - Down (↓ или S) — slide (только из run)
- * - Escape — pause
- *
- * Touch (mobile/tablet):
- * - swipe left/right -> смена полосы
- * - swipe up -> jump
- * - swipe down -> slide
- *
- * ⚠️ Чтобы не ломать архитектуру, оставляем всю логику в одном хуке.
- * GameScreen может (не обязательно) передать ref на игровое поле, чтобы
- * свайпы работали только внутри него (и не конфликтовали со скроллом страницы).
- */
+import { PLAYER_MOTION } from "../../../config/playerMotion";
+
 export function useGameControls(targetRef) {
   const dispatch = useDispatch();
   const actionState = useSelector((s) => s.game.actionState);
@@ -47,7 +19,6 @@ export function useGameControls(targetRef) {
   const actionStateRef = useRef(actionState);
   const actionTimeoutRef = useRef(null);
 
-  // всегда держим в ref актуальное значение из Redux
   useEffect(() => {
     actionStateRef.current = actionState;
   }, [actionState]);
@@ -63,7 +34,6 @@ export function useGameControls(targetRef) {
     function handleKeyDown(e) {
       const key = e.key;
 
-      // --- движение по полосам ---
       if (key === "ArrowLeft" || key === "a" || key === "ф") {
         dispatch(moveLeft());
         return;
@@ -74,7 +44,6 @@ export function useGameControls(targetRef) {
         return;
       }
 
-      // --- pause ---
       if (key === "Escape") {
         dispatch(pauseGame());
         return;
@@ -84,11 +53,8 @@ export function useGameControls(targetRef) {
       const isSlideKey = key === "ArrowDown" || key === "s" || key === "ы";
 
       const currentAction = actionStateRef.current;
-
-      // jump/slide запускается только если сейчас run
       if ((isJumpKey || isSlideKey) && currentAction !== "run") return;
 
-      // --- jump ---
       if (isJumpKey) {
         clearActionTimeout();
         dispatch(setJump());
@@ -96,16 +62,16 @@ export function useGameControls(targetRef) {
         actionTimeoutRef.current = setTimeout(() => {
           dispatch(setRun());
           actionTimeoutRef.current = null;
-        }, 650);
+        }, PLAYER_MOTION.JUMP_DURATION_MS);
 
         return;
       }
 
-      // --- slide ---
       if (isSlideKey) {
         clearActionTimeout();
         dispatch(setSlide());
 
+        // ✅ slide НЕ ТРОГАЕМ: оставляем как было
         actionTimeoutRef.current = setTimeout(() => {
           dispatch(setRun());
           actionTimeoutRef.current = null;
@@ -129,7 +95,6 @@ export function useGameControls(targetRef) {
     const el = targetRef?.current;
     if (!el) return;
 
-    // Порог, чтобы случайный микродвиж не считался свайпом
     const SWIPE_MIN_PX = 26;
     const SWIPE_MAX_TIME_MS = 450;
 
@@ -148,19 +113,24 @@ export function useGameControls(targetRef) {
     function triggerJump() {
       const currentAction = actionStateRef.current;
       if (currentAction !== "run") return;
+
       clearActionTimeout();
       dispatch(setJump());
+
       actionTimeoutRef.current = setTimeout(() => {
         dispatch(setRun());
         actionTimeoutRef.current = null;
-      }, 650);
+      }, PLAYER_MOTION.JUMP_DURATION_MS);
     }
 
     function triggerSlide() {
       const currentAction = actionStateRef.current;
       if (currentAction !== "run") return;
+
       clearActionTimeout();
       dispatch(setSlide());
+
+      // ✅ slide НЕ ТРОГАЕМ
       actionTimeoutRef.current = setTimeout(() => {
         dispatch(setRun());
         actionTimeoutRef.current = null;
@@ -168,7 +138,6 @@ export function useGameControls(targetRef) {
     }
 
     function onPointerDown(e) {
-      // только primary pointer
       if (e.isPrimary === false) return;
 
       isDown = true;
@@ -176,12 +145,9 @@ export function useGameControls(targetRef) {
       startY = e.clientY;
       startT = performance.now();
 
-      // Чтобы не выделялся текст при свайпе
       try {
         el.setPointerCapture?.(e.pointerId);
-      } catch (_) {
-        // ignore
-      }
+      } catch (_) {}
     }
 
     function onPointerUp(e) {
@@ -199,7 +165,6 @@ export function useGameControls(targetRef) {
       const isSwipe = Math.max(absX, absY) >= SWIPE_MIN_PX;
       if (!isSwipe) return;
 
-      // доминирующее направление
       if (absX > absY) {
         if (dx < 0) dispatch(moveLeft());
         else dispatch(moveRight());
@@ -213,7 +178,6 @@ export function useGameControls(targetRef) {
       isDown = false;
     }
 
-    // pointer events покрывают и touch, и pen, и mouse
     el.addEventListener("pointerdown", onPointerDown);
     el.addEventListener("pointerup", onPointerUp);
     el.addEventListener("pointercancel", onPointerCancel);

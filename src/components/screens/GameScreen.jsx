@@ -13,9 +13,9 @@ import { SHOULDER_STRIP_PERCENT } from "../../config/trackRoad";
 import { useSquareFieldSize } from "./gameScreen/useSquareFieldSize";
 import { useGameControls } from "./gameScreen/useGameControls";
 import { useWorldScrollSpeed } from "./gameScreen/useWorldScrollSpeed";
+import { useWorldSnapshot } from "./gameScreen/useWorldSnapshot";
 
 import GameHud from "./gameScreen/GameHud";
-import LaneGrid from "./gameScreen/LaneGrid";
 import PlayerActor from "./gameScreen/PlayerActor";
 
 export function GameScreen() {
@@ -31,37 +31,18 @@ export function GameScreen() {
   // Единая скорость мира (px/sec)
   const scrollSpeedRef = useWorldScrollSpeed(status, runId);
 
-  // Единый сдвиг мира (px). Все "приклеенные" слои читают его.
-  const worldOffsetRef = useRef(0);
-
-  useEffect(() => {
-    worldOffsetRef.current = 0;
-  }, [runId]);
-
-  useEffect(() => {
-    if (status !== "running") return;
-
-    let raf = 0;
-    let last = performance.now();
-
-    const tick = (ts) => {
-      const dt = (ts - last) / 1000;
-      last = ts;
-
-      const speed = scrollSpeedRef?.current ?? 0;
-      worldOffsetRef.current += speed * dt;
-
-      raf = requestAnimationFrame(tick);
-    };
-
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [status, scrollSpeedRef]);
+  // ✅ Единый snapshot мира (float + rounded px)
+  const { worldOffsetRef, worldOffsetPxRef } = useWorldSnapshot(status, runId, scrollSpeedRef);
 
   const { fieldRef, fieldPx } = useSquareFieldSize();
   useGameControls(fieldRef);
 
-  // Снимки слоёв: рыбы и препятствия используют это, чтобы избегать друг друга при спавне.
+  // фокус для WASD
+  useEffect(() => {
+    if (status === "running") fieldRef.current?.focus?.();
+  }, [status, fieldRef]);
+
+  // ✅ Храним реальные геттеры
   const obstaclesGetterRef = useRef(() => []);
   const fishGetterRef = useRef(() => []);
 
@@ -77,15 +58,16 @@ export function GameScreen() {
 
         <div
           ref={fieldRef}
-          className="relative w-full aspect-square rounded-none bg-bg border border-border shadow-soft overflow-hidden"
+          tabIndex={0}
+          onPointerDown={() => fieldRef.current?.focus?.()}
+          className="relative w-full aspect-square rounded-none bg-bg border border-border shadow-soft overflow-hidden outline-none"
           style={{ touchAction: "none" }}
         >
           <div
             className="absolute inset-0 grid"
             style={{
-              gridTemplateColumns: `${SHOULDER_STRIP_PERCENT}% ${
-                100 - SHOULDER_STRIP_PERCENT * 2
-              }% ${SHOULDER_STRIP_PERCENT}%`,
+              gridTemplateColumns: `${SHOULDER_STRIP_PERCENT}% ${100 - SHOULDER_STRIP_PERCENT * 2
+                }% ${SHOULDER_STRIP_PERCENT}%`,
             }}
           >
             {/* Левая обочина */}
@@ -101,7 +83,7 @@ export function GameScreen() {
               )}
             </div>
 
-            {/* Центр: дорога + слои */}
+            {/* Центр */}
             <div className="relative overflow-hidden">
               {fieldPx > 0 && (
                 <TrackRoad
@@ -119,9 +101,15 @@ export function GameScreen() {
                   runId={runId}
                   scrollSpeedRef={scrollSpeedRef}
                   worldOffsetRef={worldOffsetRef}
+                  // ✅ NEW: прокидываем px-offset для снапшотов
+                  worldOffsetPxRef={worldOffsetPxRef}
                   getFish={() => fishGetterRef.current()}
-                  setObstacleSnapshotGetter={(getter) => {
-                    obstaclesGetterRef.current = getter;
+                  setObstacleSnapshotGetter={(getterFactory) => {
+                    const getSnapshot =
+                      typeof getterFactory === "function" ? getterFactory() : null;
+
+                    obstaclesGetterRef.current =
+                      typeof getSnapshot === "function" ? getSnapshot : () => [];
                   }}
                 />
               )}
@@ -132,20 +120,27 @@ export function GameScreen() {
                   fieldH={fieldPx}
                   scrollSpeedRef={scrollSpeedRef}
                   worldOffsetRef={worldOffsetRef}
+                  // ✅ NEW: прокидываем px-offset для снапшотов/спавна
+                  worldOffsetPxRef={worldOffsetPxRef}
                   getObstacles={() => obstaclesGetterRef.current()}
-                  setFishSnapshotGetter={(getter) => {
-                    fishGetterRef.current = getter;
+                  setFishSnapshotGetter={(getterFactory) => {
+                    const getSnapshot =
+                      typeof getterFactory === "function" ? getterFactory() : null;
+
+                    fishGetterRef.current =
+                      typeof getSnapshot === "function" ? getSnapshot : () => [];
                   }}
                 />
               )}
 
-              <LaneGrid />
-
-              <PlayerActor
-                laneIndex={laneIndex}
-                actionState={actionState}
-                selectedCatId={selectedCatId}
-              />
+              {fieldPx > 0 && roadW > 0 && (
+                <PlayerActor
+                  laneIndex={laneIndex}
+                  actionState={actionState}
+                  selectedCatId={selectedCatId}
+                  fieldW={roadW}
+                />
+              )}
             </div>
 
             {/* Правая обочина */}

@@ -3,7 +3,6 @@
 // GameScreen НЕ должен размонтироваться на paused/gameover,
 // иначе refs в слоях (ObstacleLayer/FishLayer) обнулятся и игра начнётся заново.
 
-import React from "react";
 import { useSelector } from "react-redux";
 
 import { MainMenu } from "../components/screens/MainMenu";

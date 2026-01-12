@@ -34,8 +34,8 @@ export const OBSTACLES_CONFIG = {
 
   PLAYER_Y_PERCENT: 72,
 
-  HIT_WINDOW_PX: 8,
-  JUMP_HIT_WINDOW_PX: 14,
+  HIT_WINDOW_PX: 10,
+  JUMP_HIT_WINDOW_PX: 65,
 
   // ✅ Плотнее (меньше пустоты), но без "стены"
   SPAWN_GAP_PX: {
@@ -57,7 +57,7 @@ export const OBSTACLES_CONFIG = {
   // ✅ защищает от jump <-> slide "впритык"
   // Сделали чуть больше, чтобы игрок физически успевал
   // среагировать (особенно на мобильном свайпом).
-  ACTION_SWITCH_MIN_GAP_PX: 320,
+  ACTION_SWITCH_MIN_GAP_PX: 360,
 
   BASE_SIZE_PX: 32,
 };

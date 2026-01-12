@@ -30,6 +30,39 @@ function makeId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
+/**
+ * ✅ Нормализация typeId для контракта снапшота:
+ * FishLayer ожидает sidestep РОВНО как "sidestep".
+ *
+ * Если в конфиге/весах/старом коде встречаются варианты:
+ * - "sideStep"
+ * - "sidestep_left"
+ * - "sidestepObstacle"
+ * - и т.п.
+ * мы приводим их к "sidestep".
+ */
+function normalizeTypeId(rawTypeId) {
+  if (rawTypeId == null) return rawTypeId;
+
+  const s = String(rawTypeId);
+  const low = s.toLowerCase();
+
+  // супер-консервативно: любые варианты с sidestep/side-step/side_step
+  if (low.includes("sidestep")) return "sidestep";
+  if (low.includes("side-step")) return "sidestep";
+  if (low.includes("side_step")) return "sidestep";
+  if (low.includes("sidestep")) return "sidestep";
+  if (low === "sidestep") return "sidestep";
+
+  // частый кейс camelCase
+  if (low === "sidestep" || low === "sidestepobstacle" || low === "sidestepl") return "sidestep";
+
+  // если вдруг было именно "sideStep"
+  if (s === "sideStep") return "sidestep";
+
+  return rawTypeId;
+}
+
 export default function ObstacleLayer({
   fieldW,
   fieldH,
@@ -45,8 +78,6 @@ export default function ObstacleLayer({
   const actionState = useSelector((s) => s.game.actionState);
 
   const hostRef = useRef(null);
-
-  // fallback offset (если worldOffsetRef не передали)
   const localOffsetRef = useRef(0);
 
   const obstaclesRef = useRef([]);
@@ -79,7 +110,6 @@ export default function ObstacleLayer({
     return Math.round(getOffsetFloat());
   }
 
-  // ✅ snapshot наружу: экранные координаты + typeId
   useEffect(() => {
     if (!setObstacleSnapshotGetter) return;
 
@@ -92,7 +122,8 @@ export default function ObstacleLayer({
           y: o.y + offset, // screenY
           rule: o.rule,
           needAction: o.needAction,
-          typeId: o.typeId, // ✅ ключ: "jump" | "slide" | "sidestep"
+          // ✅ ВАЖНО: наружу всегда отдаём нормализованный typeId
+          typeId: normalizeTypeId(o.typeId),
         }));
       };
     });
@@ -128,7 +159,13 @@ export default function ObstacleLayer({
       if (!f) return false;
       const fLane = f.lane ?? f.laneIndex;
       const fY = f.y;
-      return !f.picked && !f.hidden && fLane === lane && typeof fY === "number" && Math.abs(fY - screenY) < 420;
+      return (
+        !f.picked &&
+        !f.hidden &&
+        fLane === lane &&
+        typeof fY === "number" &&
+        Math.abs(fY - screenY) < 420
+      );
     });
   }
 
@@ -149,10 +186,15 @@ export default function ObstacleLayer({
   }
 
   function spawnAtYWorld(yWorld) {
-    const typeId = pickWeighted(OBSTACLES_CONFIG.TYPE_WEIGHTS);
-    if (!typeId) return;
+    const rawTypeId = pickWeighted(OBSTACLES_CONFIG.TYPE_WEIGHTS);
+    if (!rawTypeId) return;
 
-    const type = OBSTACLE_TYPES[typeId];
+    // ✅ нормализуем сразу при создании (и в снапшоте тоже)
+    const typeId = normalizeTypeId(rawTypeId);
+
+    // ВАЖНО: тип в конфиге может храниться под сырьём (rawTypeId).
+    // Поэтому сначала пытаемся найти по rawTypeId, потом по normalized.
+    const type = OBSTACLE_TYPES[rawTypeId] ?? OBSTACLE_TYPES[typeId];
     if (!type) return;
 
     for (let i = 0; i < 16; i++) {
@@ -173,7 +215,7 @@ export default function ObstacleLayer({
         img,
         rule: type.rule,
         needAction: type.needAction,
-        typeId, // ✅ сохраняем ключ типа
+        typeId, // ✅ кладём нормализованный
         passed: false,
       });
 
@@ -232,8 +274,15 @@ export default function ObstacleLayer({
 
         const screenY = o.y + offset;
 
-        if (Math.abs(screenY - playerHitY) < OBSTACLES_CONFIG.HIT_WINDOW_PX) {
-          if (o.rule === "avoidLane" && o.lane === laneIndex) dispatch(gameOver());
+        const hitWindow =
+          o.needAction === "jump"
+            ? (OBSTACLES_CONFIG.JUMP_HIT_WINDOW_PX ?? OBSTACLES_CONFIG.HIT_WINDOW_PX)
+            : OBSTACLES_CONFIG.HIT_WINDOW_PX;
+
+        if (Math.abs(screenY - playerHitY) < hitWindow) {
+          if (o.rule === "needAction" && o.lane === laneIndex && actionState !== o.needAction) {
+            dispatch(gameOver());
+          }
           if (o.rule === "needAction" && o.lane === laneIndex && actionState !== o.needAction)
             dispatch(gameOver());
           o.passed = true;
