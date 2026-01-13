@@ -9,14 +9,14 @@ export const CATS = [
   {
     id: "bruno",
     name: "Bruno",
-    costFish: 2700,
+    costFish: 3000,
     blurb: "A bold runner who loves risky lanes.",
     advantages: ["Once per run, Bruno can survive a mistake at the cost of 20% of his collected fish."],
   },
   {
     id: "luna",
     name: "Luna",
-    costFish: 4000,
+    costFish: 1600,
     blurb: "Quick and attentive — always one step ahead.",
     advantages: ["Once per run, Luna gives a visual warning when a real danger is ahead."],
   },

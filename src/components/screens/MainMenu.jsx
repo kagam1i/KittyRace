@@ -147,7 +147,7 @@ export function MainMenu() {
 
           {/* Fish bank pinned (stable offsets) */}
           <div className="absolute top-6 right-6 ui-fade-in ui-delay-1">
-            <div className="ui-icon-chip relative">
+            <div className={`ui-icon-chip relative ${popFish ? "wallet-pop" : ""}`}>
               <img
                 src={fishIcon}
                 alt="Fish"
@@ -181,7 +181,7 @@ export function MainMenu() {
 
             <div className="ui-fade-in ui-delay-2 pointer-events-auto">
               <button
-                className="ui-btn-primary-pixel px-10 py-3 text-lg"
+                className="ui-btn-primary px-10 py-3 text-lg"
                 onClick={onStart}
                 title={!isUnlocked ? "Cat is locked" : "Start"}
               >

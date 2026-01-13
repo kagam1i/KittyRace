@@ -60,7 +60,7 @@ export default function CatCarouselCard({
                                 border border-border
                                 bg-white/70 backdrop-blur-[1px]
                                 p-3
-                                text-[15px] leading-6
+                                text-[14px] leading-6 font-semibold text-[#2f3e36]
                                 pixel-text-readable
                             "
                         >
@@ -69,7 +69,7 @@ export default function CatCarouselCard({
                             </p>
 
                             {cat?.advantages?.length > 0 && (
-                                <p className="mt-2 text-[14px] opacity-85">
+                                <p className="mt-2">
                                     {cat.advantages[0]}
                                 </p>
                             )}
