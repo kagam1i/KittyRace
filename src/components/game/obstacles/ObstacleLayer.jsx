@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 
 import ObstacleSprite from "./ObstacleSprite";
 import { OBSTACLE_TYPES, OBSTACLES_CONFIG } from "./obstacles.config";
-import { gameOver } from "../../../features/game/gameSlice";
+import { tryGameOver } from "../../../features/game/gameSlice";
 import { PLAYER_RENDER } from "../../../config/playerRender";
 
 function randInt(min, max) {
@@ -33,13 +33,6 @@ function makeId() {
 /**
  * ✅ Нормализация typeId для контракта снапшота:
  * FishLayer ожидает sidestep РОВНО как "sidestep".
- *
- * Если в конфиге/весах/старом коде встречаются варианты:
- * - "sideStep"
- * - "sidestep_left"
- * - "sidestepObstacle"
- * - и т.п.
- * мы приводим их к "sidestep".
  */
 function normalizeTypeId(rawTypeId) {
   if (rawTypeId == null) return rawTypeId;
@@ -47,17 +40,12 @@ function normalizeTypeId(rawTypeId) {
   const s = String(rawTypeId);
   const low = s.toLowerCase();
 
-  // супер-консервативно: любые варианты с sidestep/side-step/side_step
   if (low.includes("sidestep")) return "sidestep";
   if (low.includes("side-step")) return "sidestep";
   if (low.includes("side_step")) return "sidestep";
-  if (low.includes("sidestep")) return "sidestep";
   if (low === "sidestep") return "sidestep";
 
-  // частый кейс camelCase
-  if (low === "sidestep" || low === "sidestepobstacle" || low === "sidestepl") return "sidestep";
-
-  // если вдруг было именно "sideStep"
+  if (low === "sidestepobstacle" || low === "sidestepl") return "sidestep";
   if (s === "sideStep") return "sidestep";
 
   return rawTypeId;
@@ -122,7 +110,6 @@ export default function ObstacleLayer({
           y: o.y + offset, // screenY
           rule: o.rule,
           needAction: o.needAction,
-          // ✅ ВАЖНО: наружу всегда отдаём нормализованный typeId
           typeId: normalizeTypeId(o.typeId),
         }));
       };
@@ -189,11 +176,7 @@ export default function ObstacleLayer({
     const rawTypeId = pickWeighted(OBSTACLES_CONFIG.TYPE_WEIGHTS);
     if (!rawTypeId) return;
 
-    // ✅ нормализуем сразу при создании (и в снапшоте тоже)
     const typeId = normalizeTypeId(rawTypeId);
-
-    // ВАЖНО: тип в конфиге может храниться под сырьём (rawTypeId).
-    // Поэтому сначала пытаемся найти по rawTypeId, потом по normalized.
     const type = OBSTACLE_TYPES[rawTypeId] ?? OBSTACLE_TYPES[typeId];
     if (!type) return;
 
@@ -215,7 +198,7 @@ export default function ObstacleLayer({
         img,
         rule: type.rule,
         needAction: type.needAction,
-        typeId, // ✅ кладём нормализованный
+        typeId,
         passed: false,
       });
 
@@ -280,11 +263,29 @@ export default function ObstacleLayer({
             : OBSTACLES_CONFIG.HIT_WINDOW_PX;
 
         if (Math.abs(screenY - playerHitY) < hitWindow) {
-          if (o.rule === "needAction" && o.lane === laneIndex && actionState !== o.needAction) {
-            dispatch(gameOver());
+          const isMissNeedAction =
+            o.rule === "needAction" &&
+            o.lane === laneIndex &&
+            actionState !== o.needAction;
+
+          // ✅ sidestep (avoidLane): смерть если игрок в той же lane в зоне препятствия
+          const isHitAvoidLane =
+            o.rule === "avoidLane" &&
+            o.lane === laneIndex;
+
+          if (isMissNeedAction || isHitAvoidLane) {
+            // ✅ ВАЖНО: ставим passed СРАЗУ, чтобы не было второго вызова в том же кадре
+            o.passed = true;
+
+            dispatch(
+              tryGameOver({
+                obstacleTypeId: o.typeId, // "jump" | "slide" | "sidestep"
+              })
+            );
+
+            continue;
           }
-          if (o.rule === "needAction" && o.lane === laneIndex && actionState !== o.needAction)
-            dispatch(gameOver());
+
           o.passed = true;
         }
       }

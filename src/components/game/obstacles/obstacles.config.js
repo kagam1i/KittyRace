@@ -34,13 +34,13 @@ export const OBSTACLES_CONFIG = {
 
   PLAYER_Y_PERCENT: 72,
 
-  HIT_WINDOW_PX: 10,
+  HIT_WINDOW_PX: 15,
   JUMP_HIT_WINDOW_PX: 65,
 
   // ✅ Плотнее (меньше пустоты), но без "стены"
   SPAWN_GAP_PX: {
     min: 110,
-    max: 190,
+    max: 160,
   },
 
   TYPE_WEIGHTS: [

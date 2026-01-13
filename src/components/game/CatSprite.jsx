@@ -1,5 +1,6 @@
 import sheet from "../../assets/sprites/cats/cats_sheet.png";
 import { useEffect, useState, useMemo } from "react";
+import { useSelector } from "react-redux";
 
 import { CAT_ROW_BY_ID, CAT_SHEET, CAT_ANIM } from "../../config/catSprite";
 import { PLAYER_RENDER } from "../../config/playerRender";
@@ -15,8 +16,28 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
     return CAT_ANIM[actionState] ?? CAT_ANIM.run;
   }, [actionState]);
 
+
   const [sheetSize, setSheetSize] = useState({ w: 0, h: 0 });
   const [localFrame, setLocalFrame] = useState(0);
+
+  const brunoFxSeq = useSelector(
+    (s) => s.game.brunoSecondChanceFxSeq
+  );
+
+  const [blink, setBlink] = useState(false);
+
+  useEffect(() => {
+    if (!brunoFxSeq) return;
+
+    setBlink(true);
+
+    const t = setTimeout(() => {
+      setBlink(false);
+    }, 2200); // 1.4 сек — хорошо читается
+
+    return () => clearTimeout(t);
+  }, [brunoFxSeq]);
+
 
   useEffect(() => {
     const img = new Image();
@@ -76,6 +97,8 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
       }}
     >
       <div
+        className={blink ? "bruno-blink" : ""}
+
         style={{
           transform: `translateY(${spriteOffsetY}px)`,
           willChange: "transform",
@@ -89,6 +112,7 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
           height: frameH * scale,
         }}
       />
+
     </div>
   );
 }

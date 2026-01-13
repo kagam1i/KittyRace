@@ -57,24 +57,25 @@ export default function CatCarouselCard({
                         {/* DESCRIPTION */}
                         <div
                             className="
-                border border-border
-                bg-white/70 backdrop-blur-[1px]
-                p-3
-                text-[15px] leading-6
-                pixel-text-readable
-              "
+                                border border-border
+                                bg-white/70 backdrop-blur-[1px]
+                                p-3
+                                text-[15px] leading-6
+                                pixel-text-readable
+                            "
                         >
-                            {cat?.blurb}
+                            <p>
+                                {cat?.blurb}
+                            </p>
 
-                            {Array.isArray(cat?.advantages) &&
-                                cat.advantages.length > 0 && (
-                                    <ul className="mt-2 list-disc pl-5 text-[14px] leading-6 pixel-text-readable">
-                                        {cat.advantages.map((t) => (
-                                            <li key={t}>{t}</li>
-                                        ))}
-                                    </ul>
-                                )}
+                            {cat?.advantages?.length > 0 && (
+                                <p className="mt-2 text-[14px] opacity-85">
+                                    {cat.advantages[0]}
+                                </p>
+                            )}
                         </div>
+
+
 
                         {/* PRICE + BUY */}
                         {!isUnlocked && (

@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { startGame, selectCat, buyCat } from "../../features/game/gameSlice";
+import { startGame, selectCat, buyCat, addWalletFish } from "../../features/game/gameSlice";
 import { toggleSound } from "../../features/settings/settingsSlice";
 import { CATS } from "../../features/game/cats";
 
@@ -78,6 +78,33 @@ export function MainMenu() {
     dispatch(selectCat(currentCat.id));
     dispatch(startGame());
   };
+
+  // ===================== ЧИТКОД(Ctrl + Shift + F "+"/Ctrl + Shift + D "-") ==========================
+
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!import.meta.env.DEV) return;
+
+      // +1000 рыб
+      if (e.ctrlKey && e.shiftKey && e.code === "KeyF") {
+        dispatch(addWalletFish(1000));
+      }
+
+      // -1000 рыб
+      if (e.ctrlKey && e.shiftKey && e.code === "KeyD") {
+        dispatch(addWalletFish(-1000));
+      }
+    };
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [dispatch]);
+
+
+
+
+  // ============================================================
 
   return (
     <div className="min-h-screen grid place-items-center p-6 bg-bg">

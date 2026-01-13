@@ -11,7 +11,7 @@ export const CATS = [
     name: "Bruno",
     costFish: 2700,
     blurb: "A bold runner who loves risky lanes.",
-    advantages: ["Unlock to reveal his unique perk."],
+    advantages: ["Once per run, Bruno can survive a mistake at the cost of 20% of his collected fish."],
   },
   {
     id: "luna",

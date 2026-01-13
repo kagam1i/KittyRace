@@ -7,12 +7,20 @@ const initialState = {
   actionState: "run", // run|jump|slide
   selectedCatId: "milo", // milo|bruno|luna
 
-  fishCount: 0, // количество собранных рыбок за ТЕКУЩИЙ забег
-  lastRunFish: 0, // сколько рыб было собрано в прошлом забеге (для GameOver)
+  fishCount: 0, // количество собранных рыбок за ТЕКУЩИЙ забег (HUD)
+  lastRunFish: 0, // количество рыб за последний забег (GameOver)
 
-  // === ШАГ B =====================================================
-  walletFish: 0, // общий банк накопленных рыбок (между забегами)
-  unlockedCats: ["milo"], // разблокированные коты
+  // Банк рыб (между забегами)
+  walletFish: 0, // общий банк накопленных рыбок
+  unlockedCats: ["milo"], // список разблокированных котов
+
+  // FX для HUD (всплывающий текст типа "-2")
+  hudFloatText: "", // текст всплывашки
+  hudFloatSeq: 0, // счётчик, чтобы перезапускать анимацию
+
+  // Perks
+  brunoSecondChanceUsed: false, // Bruno: прощение 1 раз за забег
+  brunoSecondChanceFxSeq: 0, // триггер мигания/пульсации кота
 
   runId: 0, // идентификатор забега (меняется только на start/restart)
 };
@@ -29,9 +37,17 @@ const gameSlice = createSlice({
       state.laneIndex = 2;
       state.actionState = "run";
 
-      // Сброс счётчиков
+      // Сброс счётчика рыб за забег
       state.fishCount = 0;
       state.lastRunFish = 0;
+
+      // Сброс FX
+      state.hudFloatText = "";
+      state.hudFloatSeq = 0;
+
+      // Сброс Bruno perk
+      state.brunoSecondChanceUsed = false;
+      state.brunoSecondChanceFxSeq = 0;
 
       state.runId += 1;
     },
@@ -49,15 +65,15 @@ const gameSlice = createSlice({
     },
 
     gameOver(state) {
-      // защита от повторных вызовов (коллизия может срабатывать каждый кадр)
+      // защита от повторных вызовов
       if (state.status === "gameover") return;
 
       state.status = "gameover";
 
-      // При проигрыше сохраняем результат забега для экрана GameOver
+      // сохраняем результат для GameOver
       state.lastRunFish = state.fishCount;
 
-      // При проигрыше переносим рыбы из забега в общий банк
+      // переносим рыбы забега в банк
       if (state.fishCount > 0) {
         state.walletFish += state.fishCount;
         state.fishCount = 0;
@@ -94,28 +110,49 @@ const gameSlice = createSlice({
       state.fishCount += amount;
     },
 
-    // === ШАГ B ===================================================
-    buyCat(state, action) {
-      const { catId, cost } = action.payload;
+    // ================== DEV / ТЕСТ ==================
+    addWalletFish(state, action) {
+      const amount = action.payload ?? 0;
+      state.walletFish = Math.max(0, state.walletFish + amount);
+    },
+    // ================================================
 
+    buyCat(state, action) {
+      const { catId, cost } = action.payload || {};
       if (!catId) return;
       if (state.unlockedCats.includes(catId)) return;
 
-      if (state.walletFish >= cost) {
-        state.walletFish -= cost;
+      const price = cost ?? 0;
+      if (state.walletFish >= price) {
+        state.walletFish -= price;
         state.unlockedCats.push(catId);
       }
     },
 
-    // === ШАГ B.2 (Persist) ======================================
-    // Мягко применяем сохранённые значения, не ломая остальной state
     applyPersist(state, action) {
+      // восстановление сохранённых данных (если у тебя уже есть persist)
       const p = action.payload || {};
-
       if (typeof p.walletFish === "number") state.walletFish = p.walletFish;
       if (Array.isArray(p.unlockedCats)) state.unlockedCats = p.unlockedCats;
-      if (typeof p.selectedCatId === "string")
-        state.selectedCatId = p.selectedCatId;
+      if (typeof p.selectedCatId === "string") state.selectedCatId = p.selectedCatId;
+    },
+
+    // Bruno: помечаем, что прощение потрачено + триггерим FX у кота
+    markBrunoSecondChanceUsed(state) {
+      state.brunoSecondChanceUsed = true;
+      state.brunoSecondChanceFxSeq += 1;
+    },
+
+    // Штраф за ошибку Bruno: -N рыб в текущем забеге + всплывашка над HUD
+    applyRunFishPenalty(state, action) {
+      const amount = action.payload?.amount ?? 0;
+      if (amount <= 0) return; // ✅ если 0 — ничего не делаем, значит не будет "-0"
+
+      state.fishCount = Math.max(0, state.fishCount - amount);
+
+      // ✅ всплывающий текст над HUD: "-N"
+      state.hudFloatText = `-${amount}`;
+      state.hudFloatSeq += 1;
     },
   },
 });
@@ -133,8 +170,45 @@ export const {
   setSlide,
   selectCat,
   addFish,
+  addWalletFish,
   buyCat,
-  applyPersist, // ← для store.js
+  applyPersist,
+  markBrunoSecondChanceUsed,
+  applyRunFishPenalty,
 } = gameSlice.actions;
+
+// Bruno: 1 раз за забег прощает ошибку (jump/slide/sidestep)
+// и отнимает 20% от уже собранных рыб (fishCount).
+// ✅ Если штраф получился 0 — всплывашку не показываем.
+export const tryGameOver = ({ obstacleTypeId }) => (dispatch, getState) => {
+  const s = getState().game;
+
+  // защита: если уже gameover — не делаем ничего
+  if (s.status === "gameover") return;
+
+  const isBruno = s.selectedCatId === "bruno";
+
+  const canSecondChance =
+    isBruno &&
+    !s.brunoSecondChanceUsed &&
+    (obstacleTypeId === "jump" ||
+      obstacleTypeId === "slide" ||
+      obstacleTypeId === "sidestep");
+
+  if (canSecondChance) {
+    const current = s.fishCount ?? 0;
+    const penalty = Math.floor(current * 0.2);
+
+    // ✅ ключевая часть: только если penalty > 0
+    if (penalty > 0) {
+      dispatch(applyRunFishPenalty({ amount: penalty }));
+    }
+
+    dispatch(markBrunoSecondChanceUsed());
+    return;
+  }
+
+  dispatch(gameOver());
+};
 
 export default gameSlice.reducer;
