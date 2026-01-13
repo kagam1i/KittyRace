@@ -37,6 +37,9 @@ export function MainMenu() {
   const soundEnabled = useSelector((s) => s.settings.soundEnabled);
 
   const walletFish = useSelector((s) => s.game.walletFish);
+  const walletFloatText = useSelector((s) => s.game.walletFloatText ?? "");
+  const walletFloatSeq = useSelector((s) => s.game.walletFloatSeq ?? 0);
+
 
   const unlockedCats = useSelector((s) => s.game.unlockedCats);
 
@@ -144,8 +147,7 @@ export function MainMenu() {
 
           {/* Fish bank pinned (stable offsets) */}
           <div className="absolute top-6 right-6 ui-fade-in ui-delay-1">
-            <div className={`ui-icon-chip ${popFish ? "wallet-pop" : ""}`}>
-
+            <div className="ui-icon-chip relative">
               <img
                 src={fishIcon}
                 alt="Fish"
@@ -153,8 +155,20 @@ export function MainMenu() {
                 draggable="false"
               />
               <span className="ui-icon-chip__count">{walletFish}</span>
+
+              {/* ✅ FX: улетающий текст из банка при покупке */}
+              {walletFloatSeq > 0 && walletFloatText && (
+                <span
+                  key={walletFloatSeq}
+                  className="ui-wallet-float"
+                  aria-hidden="true"
+                >
+                  {walletFloatText}
+                </span>
+              )}
             </div>
           </div>
+
 
           {/* Top center (fixed, does NOT depend on card height) */}
           <div className="absolute inset-x-0 top-6 flex flex-col items-center pointer-events-none">

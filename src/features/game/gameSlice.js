@@ -29,6 +29,10 @@ const initialState = {
   // =========================
   lunaSenseFxSeq: 0, // seq для single-pulse Луны
   lunaSenseCooldownUntil: 0, // timestamp ms до которого активен cooldown
+
+  // FX для банка рыб (меню): улетающий текст типа "-2500"
+  walletFloatText: "",
+  walletFloatSeq: 0,
 };
 
 const gameSlice = createSlice({
@@ -136,6 +140,11 @@ const gameSlice = createSlice({
       if (state.walletFish >= price) {
         state.walletFish -= price;
         state.unlockedCats.push(catId);
+
+        if (price > 0) {
+          state.walletFloatText = `-${price}`;
+          state.walletFloatSeq += 1;
+        }
       }
     },
 
