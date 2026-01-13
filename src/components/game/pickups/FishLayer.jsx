@@ -7,20 +7,12 @@ import { FISH_CONFIG } from "./fish.config";
 import { addFish } from "../../../features/game/gameSlice";
 import { PLAYER_RENDER } from "../../../config/playerRender";
 
-import { getObstacleBoundsPx } from "../obstacles/obstacleBounds";
-
-function randInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-function makeId() {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
-  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-}
-
-function clamp(v, a, b) {
-  return Math.max(a, Math.min(b, v));
-}
+import { randInt, makeId, clamp } from "./fish.utils";
+import {
+  fishBlockedBySidestep,
+  cullInvisibleConflicts,
+  hasTooCloseFishSameLane,
+} from "./fish.spawnRules";
 
 export default function FishLayer({
   fieldW,
@@ -68,11 +60,6 @@ export default function FishLayer({
 
   function getOffsetRenderPx() {
     return Math.round(getOffsetFloat());
-  }
-
-  function getObstaclesSafe() {
-    const raw = typeof getObstacles === "function" ? getObstacles() : [];
-    return Array.isArray(raw) ? raw : [];
   }
 
   useEffect(() => {
@@ -134,92 +121,45 @@ export default function FishLayer({
 
   const SIDESTEP_LANE_RADIUS = 1;
 
-  function fishBlockedBySidestep(fishLane, fishScreenY) {
-    const fishSize = FISH_CONFIG.SIZE_PX * fishScale;
-    const fishHalf = fishSize / 2;
+  function isBlocked(lane, fishScreenY) {
+    const fishSizePx = FISH_CONFIG.SIZE_PX * fishScale;
 
-    const fishTop = fishScreenY - fishHalf;
-    const fishBot = fishScreenY + fishHalf;
-
-    const gap = FISH_SIDESTEP_GAP_PX;
-
-    for (const o of getObstaclesSafe()) {
-      if (!o || o.typeId !== "sidestep") continue;
-
-      const obsLane = o.lane ?? 0;
-      if (Math.abs(fishLane - obsLane) > SIDESTEP_LANE_RADIUS) continue;
-
-      const sY = o.y; // ✅ это уже screenY (контракт снапшота)
-      if (typeof sY !== "number") continue;
-
-      const b = getObstacleBoundsPx({
-        typeId: o.typeId,
-        laneW,
-        yPx: sY,
-      });
-
-      const top = Math.round(b.top) - gap;
-      const bottom = Math.round(b.bottom) + gap;
-
-      if (fishBot > top && fishTop < bottom) return true;
-    }
-
-    return false;
+    return fishBlockedBySidestep({
+      fishLane: lane,
+      fishScreenY,
+      getObstacles,
+      laneW,
+      fishSizePx,
+      sidestepLaneRadius: SIDESTEP_LANE_RADIUS,
+      sidestepGapPx: FISH_SIDESTEP_GAP_PX,
+    });
   }
-
-  // Мягкая страховка: если рыба ещё ВЫШЕ экрана и пересекается с sidestep — просто прячем
-  function cullInvisibleConflicts(offsetFloat) {
-    const topVisible = -40;
-    let changed = false;
-
-    for (const f of fishRef.current) {
-      if (!f || f.hidden || f.picked) continue;
-
-      const fishScreenY = f.y + offsetFloat;
-
-      if (fishScreenY > topVisible) continue; // в кадре/почти в кадре — не трогаем
-      if (!fishBlockedBySidestep(f.lane, fishScreenY)) continue;
-
-      f.hidden = true;
-      changed = true;
-    }
-
-    return changed;
-  }
-
-  function hasTooCloseFishSameLane(lane, yWorld, nowMs) {
-    const fishSize = FISH_CONFIG.SIZE_PX * fishScale;
-    const minGapCfg = FISH_CONFIG.MIN_LANE_GAP_PX ?? 52;
-
-    // ✅ защита “не впритык”: учитываем реальный размер спрайта
-    const minGap = Math.max(minGapCfg, Math.round(fishSize * 0.9));
-
-    for (const f of fishRef.current) {
-      if (!f || f.hidden) continue;
-
-      // picked fish всё ещё видна во время pop-анимации — тоже считаем занятым местом
-      const stillVisible =
-        !f.picked || (nowMs - f.pickedAtMs < (f.popDurationMs ?? POP_BASE_MS));
-
-      if (!stillVisible) continue;
-      if (f.lane !== lane) continue;
-
-      if (Math.abs(f.y - yWorld) < minGap) return true;
-    }
-
-    return false;
-  }
-
 
   function spawnFish(yWorld, nowMs) {
     const offsetFloat = getOffsetFloat();
+
+    const fishSizePx = FISH_CONFIG.SIZE_PX * fishScale;
+    const minLaneGapPx = FISH_CONFIG.MIN_LANE_GAP_PX ?? 52;
 
     for (let i = 0; i < 24; i++) {
       const lane = randInt(0, 4);
       const fishScreenY = yWorld + offsetFloat;
 
-      if (fishBlockedBySidestep(lane, fishScreenY)) continue;
-      if (hasTooCloseFishSameLane(lane, yWorld, nowMs)) continue;
+      if (isBlocked(lane, fishScreenY)) continue;
+
+      if (
+        hasTooCloseFishSameLane({
+          fishList: fishRef.current,
+          lane,
+          yWorld,
+          nowMs,
+          minLaneGapPx,
+          fishSizePx,
+          popBaseMs: POP_BASE_MS,
+        })
+      ) {
+        continue;
+      }
 
       fishRef.current.push({
         id: makeId(),
@@ -236,13 +176,11 @@ export default function FishLayer({
     }
   }
 
-
   function prewarm() {
     const offsetFloat = getOffsetFloat();
     for (let i = 0; i < 5; i++) {
       const screenY = -60 - i * 120;
       spawnFish(screenY - offsetFloat, performance.now());
-
     }
     nextSpawnPxRef.current = randInt(80, 140);
   }
@@ -277,7 +215,16 @@ export default function FishLayer({
       let mutated = false;
 
       // ✅ мягкая страховка, пока рыбы ещё не в кадре
-      if (cullInvisibleConflicts(offsetFloat)) mutated = true;
+      if (
+        cullInvisibleConflicts({
+          fishList: fishRef.current,
+          offsetFloat,
+          topVisibleScreenY: -40,
+          isBlockedFn: isBlocked,
+        })
+      ) {
+        mutated = true;
+      }
 
       // pickup
       for (const f of fishRef.current) {
