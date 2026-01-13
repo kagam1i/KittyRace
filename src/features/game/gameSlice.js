@@ -23,6 +23,12 @@ const initialState = {
   brunoSecondChanceFxSeq: 0, // триггер мигания/пульсации кота
 
   runId: 0, // идентификатор забега (меняется только на start/restart)
+
+  // =========================
+  // Luna perk (visual + cooldown)
+  // =========================
+  lunaSenseFxSeq: 0, // seq для single-pulse Луны
+  lunaSenseCooldownUntil: 0, // timestamp ms до которого активен cooldown
 };
 
 const gameSlice = createSlice({
@@ -48,6 +54,10 @@ const gameSlice = createSlice({
       // Сброс Bruno perk
       state.brunoSecondChanceUsed = false;
       state.brunoSecondChanceFxSeq = 0;
+
+      // Сброс Luna perk
+      state.lunaSenseFxSeq = 0;
+      state.lunaSenseCooldownUntil = 0;
 
       state.runId += 1;
     },
@@ -154,6 +164,17 @@ const gameSlice = createSlice({
       state.hudFloatText = `-${amount}`;
       state.hudFloatSeq += 1;
     },
+
+    // Luna: single-pulse + cooldown gate
+    triggerLunaSense(state, action) {
+      const now = action?.payload?.now ?? Date.now();
+      const COOLDOWN_MS = 2500;
+
+      if (now < (state.lunaSenseCooldownUntil ?? 0)) return;
+
+      state.lunaSenseFxSeq += 1;
+      state.lunaSenseCooldownUntil = now + COOLDOWN_MS;
+    },
   },
 });
 
@@ -175,6 +196,7 @@ export const {
   applyPersist,
   markBrunoSecondChanceUsed,
   applyRunFishPenalty,
+  triggerLunaSense,
 } = gameSlice.actions;
 
 // Bruno: 1 раз за забег прощает ошибку (jump/slide/sidestep)

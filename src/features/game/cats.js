@@ -18,6 +18,6 @@ export const CATS = [
     name: "Luna",
     costFish: 4000,
     blurb: "Quick and attentive — always one step ahead.",
-    advantages: ["Danger sense: highlights upcoming obstacles."],
+    advantages: ["Once per run, she gives a visual warning about an upcoming obstacle."],
   },
 ];

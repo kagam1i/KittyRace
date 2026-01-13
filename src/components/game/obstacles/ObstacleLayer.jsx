@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 
 import ObstacleSprite from "./ObstacleSprite";
 import { OBSTACLE_TYPES, OBSTACLES_CONFIG } from "./obstacles.config";
-import { tryGameOver } from "../../../features/game/gameSlice";
+import { tryGameOver, triggerLunaSense } from "../../../features/game/gameSlice";
 import { PLAYER_RENDER } from "../../../config/playerRender";
 
 function randInt(min, max) {
@@ -64,6 +64,10 @@ export default function ObstacleLayer({
   const status = useSelector((s) => s.game.status);
   const laneIndex = useSelector((s) => s.game.laneIndex);
   const actionState = useSelector((s) => s.game.actionState);
+
+  // ✅ Luna only (cooldown gate живёт в gameSlice)
+  const selectedCatId = useSelector((s) => s.game.selectedCatId);
+  const lunaCooldownUntil = useSelector((s) => s.game.lunaSenseCooldownUntil ?? 0);
 
   const hostRef = useRef(null);
   const localOffsetRef = useRef(0);
@@ -252,10 +256,27 @@ export default function ObstacleLayer({
 
       const playerHitY = fieldH - PLAYER_RENDER.GROUND_BOTTOM_PX - 10;
 
+      const WARN_PX = 240;
+
       for (const o of obstaclesRef.current) {
         if (o.passed) continue;
 
         const screenY = o.y + offset;
+
+        // ✅ Luna warning (event-based, cooldown в slice)
+        if (
+          selectedCatId === "luna" &&
+          o.lane === laneIndex &&
+          (o.rule === "needAction" || o.rule === "avoidLane")
+        ) {
+          const now = Date.now();
+          if (now >= lunaCooldownUntil) {
+            const distAhead = playerHitY - screenY; // >0 — obstacle выше и приближается
+            if (distAhead > 0 && distAhead < WARN_PX) {
+              dispatch(triggerLunaSense({ now }));
+            }
+          }
+        }
 
         const hitWindow =
           o.needAction === "jump"
@@ -269,17 +290,14 @@ export default function ObstacleLayer({
             actionState !== o.needAction;
 
           // ✅ sidestep (avoidLane): смерть если игрок в той же lane в зоне препятствия
-          const isHitAvoidLane =
-            o.rule === "avoidLane" &&
-            o.lane === laneIndex;
+          const isHitAvoidLane = o.rule === "avoidLane" && o.lane === laneIndex;
 
           if (isMissNeedAction || isHitAvoidLane) {
-            // ✅ ВАЖНО: ставим passed СРАЗУ, чтобы не было второго вызова в том же кадре
             o.passed = true;
 
             dispatch(
               tryGameOver({
-                obstacleTypeId: o.typeId, // "jump" | "slide" | "sidestep"
+                obstacleTypeId: o.typeId,
               })
             );
 
@@ -297,7 +315,17 @@ export default function ObstacleLayer({
 
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [status, fieldH, laneIndex, actionState, scrollSpeedRef, worldOffsetRef, dispatch]);
+  }, [
+    status,
+    fieldH,
+    laneIndex,
+    actionState,
+    scrollSpeedRef,
+    worldOffsetRef,
+    dispatch,
+    selectedCatId,
+    lunaCooldownUntil,
+  ]);
 
   return (
     <div

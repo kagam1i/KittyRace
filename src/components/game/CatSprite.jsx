@@ -16,14 +16,13 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
     return CAT_ANIM[actionState] ?? CAT_ANIM.run;
   }, [actionState]);
 
-
   const [sheetSize, setSheetSize] = useState({ w: 0, h: 0 });
   const [localFrame, setLocalFrame] = useState(0);
 
-  const brunoFxSeq = useSelector(
-    (s) => s.game.brunoSecondChanceFxSeq
-  );
-
+  // =========================
+  // Bruno “second chance” FX (НЕ ТРОГАЕМ)
+  // =========================
+  const brunoFxSeq = useSelector((s) => s.game.brunoSecondChanceFxSeq);
   const [blink, setBlink] = useState(false);
 
   useEffect(() => {
@@ -33,11 +32,26 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
 
     const t = setTimeout(() => {
       setBlink(false);
-    }, 2200); // 1.4 сек — хорошо читается
+    }, 2200); // Длительность анимации в CSS
 
     return () => clearTimeout(t);
   }, [brunoFxSeq]);
 
+  // =========================
+  // Luna: event-based pulse + cooldown indicator
+  // =========================
+  const lunaFxSeq = useSelector((s) => s.game.lunaSenseFxSeq);
+  const lunaCooldownUntil = useSelector((s) => s.game.lunaSenseCooldownUntil ?? 0);
+
+  // Чтобы cooldown визуально обновлялся сам
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  useEffect(() => {
+    if (catId !== "luna") return;
+    const id = setInterval(() => setNowTs(Date.now()), 120);
+    return () => clearInterval(id);
+  }, [catId]);
+
+  const isLunaCooldown = catId === "luna" && nowTs < lunaCooldownUntil;
 
   useEffect(() => {
     const img = new Image();
@@ -87,18 +101,41 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
     PLAYER_RENDER.SPRITE_OFFSET_Y_PX.run ??
     0;
 
+  const containerW = frameW * scale;
+  const containerH = renderH * scale;
+
   return (
     <div
-      className="pixelated"
+      className="pixelated relative z-[60]"
       style={{
-        width: frameW * scale,
-        height: renderH * scale,
-        overflow: "hidden",
+        width: containerW,
+        height: containerH,
+        overflow: "visible",
       }}
     >
+      {/* Luna: перезапуск single-pulse через remount wrapper (key=lunaFxSeq) */}
+      {catId === "luna" && (
+        <span
+          key={lunaFxSeq}
+          className={isLunaCooldown ? "luna-cooldown" : ""}
+          style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+          aria-hidden="true"
+        >
+          {/* ✅ НЕПРИКОСНОВЕННЫЙ БЛОК (как ты зафиксировала) */}
+          <div
+            className="luna-warn-dot luna-blink"
+            aria-hidden="true"
+            style={{
+              top: -6,
+              left: Math.round(containerW * 0.39),
+            }}
+          />
+        </span>
+      )}
+
+      {/* Bruno */}
       <div
         className={blink ? "bruno-blink" : ""}
-
         style={{
           transform: `translateY(${spriteOffsetY}px)`,
           willChange: "transform",
@@ -112,7 +149,6 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
           height: frameH * scale,
         }}
       />
-
     </div>
   );
 }
