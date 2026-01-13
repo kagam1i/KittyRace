@@ -6,50 +6,14 @@ import { OBSTACLE_TYPES, OBSTACLES_CONFIG } from "./obstacles.config";
 import { tryGameOver, triggerLunaSense } from "../../../features/game/gameSlice";
 import { PLAYER_RENDER } from "../../../config/playerRender";
 
-function randInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+import {
+  fishConflict,
+  laneHasEnoughGap,
+  laneHasEnoughActionSwitchGap,
+} from "./obstacles.spawnRules";
 
-function pickWeighted(list) {
-  const safe = Array.isArray(list) ? list : [];
-  if (safe.length === 0) return null;
+import { randInt, pickWeighted, makeId, normalizeTypeId } from "./obstacles.utils";
 
-  const sum = safe.reduce((s, x) => s + (x?.w ?? 0), 0);
-  if (sum <= 0) return safe[0]?.type ?? null;
-
-  let r = Math.random() * sum;
-  for (const x of safe) {
-    r -= x.w;
-    if (r <= 0) return x.type;
-  }
-  return safe[0].type;
-}
-
-function makeId() {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
-  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-}
-
-/**
- * ✅ Нормализация typeId для контракта снапшота:
- * FishLayer ожидает sidestep РОВНО как "sidestep".
- */
-function normalizeTypeId(rawTypeId) {
-  if (rawTypeId == null) return rawTypeId;
-
-  const s = String(rawTypeId);
-  const low = s.toLowerCase();
-
-  if (low.includes("sidestep")) return "sidestep";
-  if (low.includes("side-step")) return "sidestep";
-  if (low.includes("side_step")) return "sidestep";
-  if (low === "sidestep") return "sidestep";
-
-  if (low === "sidestepobstacle" || low === "sidestepl") return "sidestep";
-  if (s === "sideStep") return "sidestep";
-
-  return rawTypeId;
-}
 
 export default function ObstacleLayer({
   fieldW,
@@ -57,6 +21,8 @@ export default function ObstacleLayer({
   runId,
   scrollSpeedRef,
   worldOffsetRef,
+  // ✅ единый rAF: слой не имеет своего requestAnimationFrame
+  subscribeWorld,
   setObstacleSnapshotGetter,
   getFish,
 }) {
@@ -64,6 +30,7 @@ export default function ObstacleLayer({
   const status = useSelector((s) => s.game.status);
   const laneIndex = useSelector((s) => s.game.laneIndex);
   const actionState = useSelector((s) => s.game.actionState);
+  const actionUntilMs = useSelector((s) => s.game.actionUntilMs ?? 0);
 
   // ✅ Luna only (cooldown gate живёт в gameSlice)
   const selectedCatId = useSelector((s) => s.game.selectedCatId);
@@ -78,6 +45,9 @@ export default function ObstacleLayer({
   const nextSpawnPxRef = useRef(
     randInt(OBSTACLES_CONFIG.SPAWN_GAP_PX.min, OBSTACLES_CONFIG.SPAWN_GAP_PX.max)
   );
+
+  const prevActionRef = useRef(actionState);
+
 
   const [, bumpRender] = useState(0);
 
@@ -128,53 +98,20 @@ export default function ObstacleLayer({
     lastTimeRef.current = 0;
     localOffsetRef.current = 0;
 
-    nextSpawnPxRef.current = randInt(
-      OBSTACLES_CONFIG.SPAWN_GAP_PX.min,
-      OBSTACLES_CONFIG.SPAWN_GAP_PX.max
+    // ✅ чтобы в начале забега трасса не была пустой:
+    // первый спавн делаем заметно быстрее, чем обычный gap.
+    // Дальше используется стандартный SPAWN_GAP_PX.
+    const firstMin = Math.max(20, Math.floor(OBSTACLES_CONFIG.SPAWN_GAP_PX.min * 0.25));
+    const firstMax = Math.max(
+      firstMin + 10,
+      Math.floor(OBSTACLES_CONFIG.SPAWN_GAP_PX.min * 0.55)
     );
+    nextSpawnPxRef.current = randInt(firstMin, firstMax);
 
     if (hostRef.current) hostRef.current.style.transform = "translate3d(0px, 0px, 0px)";
     bumpRender((x) => x + 1);
   }, [runId]);
 
-  function getFishListSafe() {
-    const list = typeof getFish === "function" ? getFish() : [];
-    return Array.isArray(list) ? list : [];
-  }
-
-  function fishConflict(lane, yWorld) {
-    const screenY = yWorld + getOffsetRenderPx();
-    const fishList = getFishListSafe();
-
-    return fishList.some((f) => {
-      if (!f) return false;
-      const fLane = f.lane ?? f.laneIndex;
-      const fY = f.y;
-      return (
-        !f.picked &&
-        !f.hidden &&
-        fLane === lane &&
-        typeof fY === "number" &&
-        Math.abs(fY - screenY) < 420
-      );
-    });
-  }
-
-  function laneHasEnoughGap(lane, yWorld) {
-    return !obstaclesRef.current.some(
-      (o) => o.lane === lane && Math.abs(o.y - yWorld) < OBSTACLES_CONFIG.SAME_LANE_MIN_GAP_PX
-    );
-  }
-
-  function laneHasEnoughActionSwitchGap(lane, yWorld, type) {
-    if (type.rule !== "needAction") return true;
-
-    const next = obstaclesRef.current.find((o) => o.lane === lane && o.y > yWorld);
-    if (!next || next.rule !== "needAction") return true;
-    if (next.needAction === type.needAction) return true;
-
-    return next.y - yWorld >= OBSTACLES_CONFIG.ACTION_SWITCH_MIN_GAP_PX;
-  }
 
   function spawnAtYWorld(yWorld) {
     const rawTypeId = pickWeighted(OBSTACLES_CONFIG.TYPE_WEIGHTS);
@@ -187,10 +124,35 @@ export default function ObstacleLayer({
     for (let i = 0; i < 16; i++) {
       const lane = randInt(0, 4);
 
-      if (!laneHasEnoughGap(lane, yWorld)) continue;
-      if (!laneHasEnoughActionSwitchGap(lane, yWorld, type)) continue;
+      if (
+        !laneHasEnoughGap({
+          obstacles: obstaclesRef.current,
+          lane,
+          yWorld,
+          minGapPx: OBSTACLES_CONFIG.SAME_LANE_MIN_GAP_PX,
+        })
+      ) continue;
 
-      if (type.rule === "avoidLane" && fishConflict(lane, yWorld)) continue;
+      if (
+        !laneHasEnoughActionSwitchGap({
+          obstacles: obstaclesRef.current,
+          lane,
+          yWorld,
+          type,
+          actionSwitchMinGapPx: OBSTACLES_CONFIG.ACTION_SWITCH_MIN_GAP_PX,
+        })
+      ) continue;
+
+      if (
+        type.rule === "avoidLane" &&
+        fishConflict({
+          lane,
+          yWorld,
+          getOffsetPx: getOffsetRenderPx,
+          getFish,
+          rangePx: 420,
+        })
+      ) continue;
 
       const img = type.images[randInt(0, type.images.length - 1)];
 
@@ -215,21 +177,14 @@ export default function ObstacleLayer({
 
     lastTimeRef.current = 0;
 
-    let raf = 0;
+    const TIP_FAIL_WINDOW_MS = 45;
 
-    const frame = (t) => {
-      if (!lastTimeRef.current) lastTimeRef.current = t;
-      const dt = (t - lastTimeRef.current) / 1000;
-      lastTimeRef.current = t;
+    const step = ({ dt, speed, worldOffsetPx }) => {
+      const dy = (speed ?? 0) * (dt ?? 0);
+      const offset = typeof worldOffsetPx === "number" ? worldOffsetPx : getOffsetRenderPx();
 
-      const speed = scrollSpeedRef?.current ?? 0;
-      const dy = speed * dt;
-
-      if (!(typeof worldOffsetRef?.current === "number")) {
-        localOffsetRef.current += dy;
-      }
-
-      const offset = getOffsetRenderPx();
+      const justLanded = prevActionRef.current === "jump" && actionState !== "jump";
+      prevActionRef.current = actionState;
 
       if (hostRef.current) {
         hostRef.current.style.transform = `translate3d(0px, ${offset}px, 0px)`;
@@ -255,15 +210,27 @@ export default function ObstacleLayer({
       }
 
       const playerHitY = fieldH - PLAYER_RENDER.GROUND_BOTTOM_PX - 10;
-
       const WARN_PX = 240;
+
+
 
       for (const o of obstaclesRef.current) {
         if (o.passed) continue;
 
         const screenY = o.y + offset;
 
-        // ✅ Luna warning (event-based, cooldown в slice) — ТЕПЕРЬ "ПО ДЕЛУ"
+        const hitWindow =
+          o.needAction === "jump"
+            ? (OBSTACLES_CONFIG.JUMP_HIT_WINDOW_PX ?? OBSTACLES_CONFIG.HIT_WINDOW_PX)
+            : OBSTACLES_CONFIG.HIT_WINDOW_PX;
+
+        // ✅ Если препятствие уже далеко позади — считаем пройденным
+        if (screenY - playerHitY > hitWindow) {
+          o.passed = true;
+          continue;
+        }
+
+        // ✅ Luna warning — без изменений
         if (
           selectedCatId === "luna" &&
           o.lane === laneIndex &&
@@ -271,53 +238,100 @@ export default function ObstacleLayer({
         ) {
           const now = Date.now();
           if (now >= lunaCooldownUntil) {
-            const distAhead = playerHitY - screenY; // >0 — obstacle выше и приближается
-            if (distAhead > 0 && distAhead < WARN_PX) {
+            const distAheadWarn = playerHitY - screenY;
+            if (distAheadWarn > 0 && distAheadWarn < WARN_PX) {
               const isRealDanger =
-                // needAction: опасно только если действие НЕ то
                 (o.rule === "needAction" && actionState !== o.needAction) ||
-                // sidestep/avoidLane: опасно всегда, если в lane и близко
                 (o.rule === "avoidLane");
-
-              if (isRealDanger) {
-                dispatch(triggerLunaSense({ now }));
-              }
+              if (isRealDanger) dispatch(triggerLunaSense({ now }));
             }
           }
         }
 
-        const hitWindow =
-          o.needAction === "jump"
-            ? (OBSTACLES_CONFIG.JUMP_HIT_WINDOW_PX ?? OBSTACLES_CONFIG.HIT_WINDOW_PX)
-            : OBSTACLES_CONFIG.HIT_WINDOW_PX;
-
+        // Дальше работаем только если препятствие рядом с игроком
         if (Math.abs(screenY - playerHitY) < hitWindow) {
-          const isMissNeedAction =
-            o.rule === "needAction" &&
-            o.lane === laneIndex &&
-            actionState !== o.needAction;
+          const sameLane = o.lane === laneIndex;
 
-          // ✅ sidestep (avoidLane): смерть если игрок в той же lane в зоне препятствия
-          const isHitAvoidLane = o.rule === "avoidLane" && o.lane === laneIndex;
+          // -------- avoidLane (sidestep) --------
+          if (o.rule === "avoidLane") {
+            if (sameLane) {
+              o.passed = true;
+              dispatch(tryGameOver({ obstacleTypeId: o.typeId }));
+              continue;
+            }
 
-          if (isMissNeedAction || isHitAvoidLane) {
-            o.passed = true;
-
-            dispatch(
-              tryGameOver({
-                obstacleTypeId: o.typeId,
-              })
-            );
-
+            // игрок ушёл в другую lane — пометим passed когда препятствие дошло до уровня игрока/ниже
+            if (screenY >= playerHitY) o.passed = true;
             continue;
           }
 
-          o.passed = true;
+          // -------- needAction (jump/slide) --------
+          if (o.rule === "needAction" && sameLane) {
+            // не то действие -> смерть
+            if (actionState !== o.needAction) {
+              o.passed = true;
+              dispatch(tryGameOver({ obstacleTypeId: o.typeId }));
+              continue;
+            }
+
+            // правильное действие:
+            if (o.needAction === "jump") {
+              // "кончик" — только при приземлении и только если препятствие ещё чуть впереди
+              const distAhead = playerHitY - screenY; // >=0 впереди
+              const TIP_TIP_BAND_PX = 10;
+
+              if (justLanded && distAhead >= 0 && distAhead <= TIP_TIP_BAND_PX) {
+                o.passed = true;
+                dispatch(tryGameOver({ obstacleTypeId: o.typeId }));
+                continue;
+              }
+
+              // ✅ Ключевая штука: если мы в прыжке и препятствие дошло до уровня ног/ниже —
+              // значит прыжок УЖЕ успешен. Ставим passed и НЕ даём умереть на выходе из jump.
+              if (screenY >= playerHitY) {
+                o.passed = true;
+              }
+
+              continue;
+            }
+
+            // slide: правильный слайд — можно сразу считать пройденным в окне
+            o.passed = true;
+            continue;
+          }
+
+          // needAction но в другой lane — не трогаем (пройдёт само по "позади")
         }
       }
 
-      if (removed || spawned) bumpRender((x) => x + 1);
 
+
+
+      if (removed || spawned) bumpRender((x) => x + 1);
+    };
+
+    // ✅ Приоритет: единый rAF через subscribeWorld.
+    if (typeof subscribeWorld === "function") {
+      const unsubscribe = subscribeWorld((snap) => step(snap));
+      return unsubscribe;
+    }
+
+    // --- fallback: локальный rAF ---
+    let raf = 0;
+    let last = performance.now();
+
+    const frame = (t) => {
+      const dt = Math.max(0, Math.min(0.05, (t - last) / 1000));
+      last = t;
+
+      const speed = scrollSpeedRef?.current ?? 0;
+      const dy = speed * dt;
+
+      if (!(typeof worldOffsetRef?.current === "number")) {
+        localOffsetRef.current += dy;
+      }
+
+      step({ dt, speed, worldOffsetPx: getOffsetRenderPx() });
       raf = requestAnimationFrame(frame);
     };
 
@@ -328,8 +342,10 @@ export default function ObstacleLayer({
     fieldH,
     laneIndex,
     actionState,
+    actionUntilMs,
     scrollSpeedRef,
     worldOffsetRef,
+    subscribeWorld,
     dispatch,
     selectedCatId,
     lunaCooldownUntil,

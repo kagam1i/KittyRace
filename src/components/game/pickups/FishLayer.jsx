@@ -187,14 +187,39 @@ export default function FishLayer({
     return changed;
   }
 
-  function spawnFish(yWorld) {
+  function hasTooCloseFishSameLane(lane, yWorld, nowMs) {
+    const fishSize = FISH_CONFIG.SIZE_PX * fishScale;
+    const minGapCfg = FISH_CONFIG.MIN_LANE_GAP_PX ?? 52;
+
+    // ✅ защита “не впритык”: учитываем реальный размер спрайта
+    const minGap = Math.max(minGapCfg, Math.round(fishSize * 0.9));
+
+    for (const f of fishRef.current) {
+      if (!f || f.hidden) continue;
+
+      // picked fish всё ещё видна во время pop-анимации — тоже считаем занятым местом
+      const stillVisible =
+        !f.picked || (nowMs - f.pickedAtMs < (f.popDurationMs ?? POP_BASE_MS));
+
+      if (!stillVisible) continue;
+      if (f.lane !== lane) continue;
+
+      if (Math.abs(f.y - yWorld) < minGap) return true;
+    }
+
+    return false;
+  }
+
+
+  function spawnFish(yWorld, nowMs) {
     const offsetFloat = getOffsetFloat();
 
-    for (let i = 0; i < 18; i++) {
+    for (let i = 0; i < 24; i++) {
       const lane = randInt(0, 4);
       const fishScreenY = yWorld + offsetFloat;
 
       if (fishBlockedBySidestep(lane, fishScreenY)) continue;
+      if (hasTooCloseFishSameLane(lane, yWorld, nowMs)) continue;
 
       fishRef.current.push({
         id: makeId(),
@@ -211,11 +236,13 @@ export default function FishLayer({
     }
   }
 
+
   function prewarm() {
     const offsetFloat = getOffsetFloat();
     for (let i = 0; i < 5; i++) {
       const screenY = -60 - i * 120;
-      spawnFish(screenY - offsetFloat);
+      spawnFish(screenY - offsetFloat, performance.now());
+
     }
     nextSpawnPxRef.current = randInt(80, 140);
   }
@@ -283,7 +310,8 @@ export default function FishLayer({
       // spawn
       nextSpawnPxRef.current -= dy;
       if (nextSpawnPxRef.current <= 0) {
-        spawnFish(-40 - offsetFloat);
+        spawnFish(-40 - offsetFloat, t);
+
         nextSpawnPxRef.current = randInt(
           FISH_CONFIG.SPAWN_GAP_PX.min,
           FISH_CONFIG.SPAWN_GAP_PX.max

@@ -29,20 +29,23 @@ export function GameScreen() {
   const runId = useSelector((s) => s.game.runId);
 
   // Единая скорость мира (px/sec)
-  const scrollSpeedRef = useWorldScrollSpeed(status, runId);
+  const { scrollSpeedRef, updateSpeed } = useWorldScrollSpeed(status, runId);
 
-  // ✅ Единый snapshot мира (float + rounded px)
-  const { worldOffsetRef, worldOffsetPxRef } = useWorldSnapshot(status, runId, scrollSpeedRef);
+  // ✅ Единый snapshot мира (float + rounded px) + единый rAF
+  const { worldOffsetRef, subscribe } = useWorldSnapshot(
+    status,
+    runId,
+    scrollSpeedRef,
+    updateSpeed
+  );
 
   const { fieldRef, fieldPx } = useSquareFieldSize();
   useGameControls(fieldRef);
 
-  // фокус для WASD
   useEffect(() => {
     if (status === "running") fieldRef.current?.focus?.();
   }, [status, fieldRef]);
 
-  // ✅ Храним реальные геттеры
   const obstaclesGetterRef = useRef(() => []);
   const fishGetterRef = useRef(() => []);
 
@@ -50,10 +53,7 @@ export function GameScreen() {
 
   return (
     <div className="min-h-[100svh] bg-bg grid place-items-center p-3 sm:p-6">
-      <div
-        className="relative w-full"
-        style={{ width: "min(640px, 96vw, calc(100svh - 160px))" }}
-      >
+      <div className="relative w-full" style={{ width: "min(640px, 96vw, calc(100svh - 160px))" }}>
         <GameHud onMenuClick={() => dispatch(pauseGame())} />
 
         <div
@@ -79,6 +79,7 @@ export function GameScreen() {
                   status={status}
                   scrollSpeedRef={scrollSpeedRef}
                   worldOffsetRef={worldOffsetRef}
+                  subscribeWorld={subscribe}
                 />
               )}
             </div>
@@ -91,6 +92,7 @@ export function GameScreen() {
                   status={status}
                   scrollSpeedRef={scrollSpeedRef}
                   worldOffsetRef={worldOffsetRef}
+                  subscribeWorld={subscribe}
                 />
               )}
 
@@ -101,15 +103,11 @@ export function GameScreen() {
                   runId={runId}
                   scrollSpeedRef={scrollSpeedRef}
                   worldOffsetRef={worldOffsetRef}
-                  // ✅ NEW: прокидываем px-offset для снапшотов
-                  worldOffsetPxRef={worldOffsetPxRef}
+                  subscribeWorld={subscribe}
                   getFish={() => fishGetterRef.current()}
                   setObstacleSnapshotGetter={(getterFactory) => {
-                    const getSnapshot =
-                      typeof getterFactory === "function" ? getterFactory() : null;
-
-                    obstaclesGetterRef.current =
-                      typeof getSnapshot === "function" ? getSnapshot : () => [];
+                    const getSnapshot = typeof getterFactory === "function" ? getterFactory() : null;
+                    obstaclesGetterRef.current = typeof getSnapshot === "function" ? getSnapshot : () => [];
                   }}
                 />
               )}
@@ -120,15 +118,11 @@ export function GameScreen() {
                   fieldH={fieldPx}
                   scrollSpeedRef={scrollSpeedRef}
                   worldOffsetRef={worldOffsetRef}
-                  // ✅ NEW: прокидываем px-offset для снапшотов/спавна
-                  worldOffsetPxRef={worldOffsetPxRef}
+                  subscribeWorld={subscribe}
                   getObstacles={() => obstaclesGetterRef.current()}
                   setFishSnapshotGetter={(getterFactory) => {
-                    const getSnapshot =
-                      typeof getterFactory === "function" ? getterFactory() : null;
-
-                    fishGetterRef.current =
-                      typeof getSnapshot === "function" ? getSnapshot : () => [];
+                    const getSnapshot = typeof getterFactory === "function" ? getterFactory() : null;
+                    fishGetterRef.current = typeof getSnapshot === "function" ? getSnapshot : () => [];
                   }}
                 />
               )}
@@ -139,6 +133,7 @@ export function GameScreen() {
                   actionState={actionState}
                   selectedCatId={selectedCatId}
                   fieldW={roadW}
+                  subscribeWorld={subscribe}
                 />
               )}
             </div>
@@ -152,6 +147,7 @@ export function GameScreen() {
                   status={status}
                   scrollSpeedRef={scrollSpeedRef}
                   worldOffsetRef={worldOffsetRef}
+                  subscribeWorld={subscribe}
                 />
               )}
             </div>

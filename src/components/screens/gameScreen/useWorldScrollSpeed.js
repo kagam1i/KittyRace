@@ -9,7 +9,7 @@
 //   будет вызывать лишние ререндеры. Для этой задачи идеален useRef.
 // - Ускорение делаем редким и небольшим, чтобы не было дёрганий и не ломался геймплей.
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import {
   ROAD_SCROLL_SPEED_PX_PER_SEC,
@@ -22,53 +22,41 @@ import {
  * Возвращает ref на текущую скорость прокрутки (px/sec).
  *
  * - При новом забеге (runId) скорость сбрасывается к базовой.
- * - Пока игра в статусе "running" скорость медленно растёт.
+ * - Скорость обновляется ТОЛЬКО из ЕДИНОГО rAF (useWorldSnapshot).
  * - На паузе рост останавливается, но текущая скорость сохраняется.
  */
-export function useWorldScrollSpeed(status, runId) {
+export function useWorldScrollSpeed(_status, runId) {
   const speedRef = useRef(ROAD_SCROLL_SPEED_PX_PER_SEC);
-
-  // Сколько времени прошло с последнего "шага" ускорения.
   const rampTimerRef = useRef(0);
 
   useEffect(() => {
-    // Новый забег — начинаем с базовой скорости.
     speedRef.current = ROAD_SCROLL_SPEED_PX_PER_SEC;
     rampTimerRef.current = 0;
   }, [runId]);
 
-  useEffect(() => {
-    if (status !== "running") return;
+  // ✅ Обновление скорости вызывается из ЕДИНОГО rAF (useWorldSnapshot)
+  const updateSpeed = useCallback((dtSec) => {
+    const dt = typeof dtSec === "number" && dtSec > 0 ? dtSec : 0;
+    if (dt === 0) return;
 
-    let raf = 0;
-    let lastTs = 0;
+    rampTimerRef.current += dt;
+    const interval = WORLD_SPEED_RAMP_INTERVAL_SEC;
 
-    const tick = (ts) => {
-      if (!lastTs) lastTs = ts;
+    if (interval > 0 && rampTimerRef.current >= interval) {
+      const steps = Math.floor(rampTimerRef.current / interval);
+      rampTimerRef.current -= steps * interval;
 
-      const dt = (ts - lastTs) / 1000;
-      lastTs = ts;
+      let v = speedRef.current;
+      for (let i = 0; i < steps; i++) v *= WORLD_SPEED_RAMP_MULT;
+      speedRef.current = Math.min(WORLD_SCROLL_SPEED_MAX_PX_PER_SEC, v);
+    }
+  }, []);
 
-      // Накапливаем время и при необходимости делаем несколько "шагов" ускорения.
-      // Это важно, если вкладка была в фоне или кадры пропускались.
-      rampTimerRef.current += dt;
-      const interval = WORLD_SPEED_RAMP_INTERVAL_SEC;
-
-      if (interval > 0 && rampTimerRef.current >= interval) {
-        const steps = Math.floor(rampTimerRef.current / interval);
-        rampTimerRef.current -= steps * interval;
-
-        let v = speedRef.current;
-        for (let i = 0; i < steps; i++) v *= WORLD_SPEED_RAMP_MULT;
-        speedRef.current = Math.min(WORLD_SCROLL_SPEED_MAX_PX_PER_SEC, v);
-      }
-
-      raf = requestAnimationFrame(tick);
-    };
-
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [status]);
-
-  return speedRef;
+  return useMemo(
+    () => ({
+      scrollSpeedRef: speedRef,
+      updateSpeed,
+    }),
+    [updateSpeed]
+  );
 }

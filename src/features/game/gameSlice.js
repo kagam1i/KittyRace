@@ -1,36 +1,29 @@
 import { createSlice } from "@reduxjs/toolkit";
 
-// начальное состояние игры
 const initialState = {
-  status: "menu", // menu|running|paused|gameover
-  laneIndex: 2, // текущая полоса 0|1|2|3|4
-  actionState: "run", // run|jump|slide
-  selectedCatId: "milo", // milo|bruno|luna
+  status: "menu",
+  laneIndex: 2,
+  actionState: "run",
+  actionUntilMs: 0, // ✅ добавлено
+  selectedCatId: "milo",
 
-  fishCount: 0, // количество собранных рыбок за ТЕКУЩИЙ забег (HUD)
-  lastRunFish: 0, // количество рыб за последний забег (GameOver)
+  fishCount: 0,
+  lastRunFish: 0,
 
-  // Банк рыб (между забегами)
-  walletFish: 0, // общий банк накопленных рыбок
-  unlockedCats: ["milo"], // список разблокированных котов
+  walletFish: 0,
+  unlockedCats: ["milo"],
 
-  // FX для HUD (всплывающий текст типа "-2")
-  hudFloatText: "", // текст всплывашки
-  hudFloatSeq: 0, // счётчик, чтобы перезапускать анимацию
+  hudFloatText: "",
+  hudFloatSeq: 0,
 
-  // Perks
-  brunoSecondChanceUsed: false, // Bruno: прощение 1 раз за забег
-  brunoSecondChanceFxSeq: 0, // триггер мигания/пульсации кота
+  brunoSecondChanceUsed: false,
+  brunoSecondChanceFxSeq: 0,
 
-  runId: 0, // идентификатор забега (меняется только на start/restart)
+  runId: 0,
 
-  // =========================
-  // Luna perk (visual + cooldown)
-  // =========================
-  lunaSenseFxSeq: 0, // seq для single-pulse Луны
-  lunaSenseCooldownUntil: 0, // timestamp ms до которого активен cooldown
+  lunaSenseFxSeq: 0,
+  lunaSenseCooldownUntil: 0,
 
-  // FX для банка рыб (меню): улетающий текст типа "-2500"
   walletFloatText: "",
   walletFloatSeq: 0,
 };
@@ -104,14 +97,17 @@ const gameSlice = createSlice({
 
     setRun(state) {
       state.actionState = "run";
+      state.actionUntilMs = 0;
     },
 
-    setJump(state) {
+    setJump(state, action) {
       state.actionState = "jump";
+      state.actionUntilMs = action.payload?.untilMs ?? 0;
     },
 
-    setSlide(state) {
+    setSlide(state, action) {
       state.actionState = "slide";
+      state.actionUntilMs = action.payload?.untilMs ?? 0;
     },
 
     selectCat(state, action) {

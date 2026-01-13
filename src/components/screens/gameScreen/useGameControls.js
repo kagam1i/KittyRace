@@ -54,12 +54,11 @@ export function useGameControls(targetRef) {
 
       const currentAction = actionStateRef.current;
 
-      // jump/slide запускается только если сейчас run
       if ((isJumpKey || isSlideKey) && currentAction !== "run") return;
 
       if (isJumpKey) {
         clearActionTimeout();
-        dispatch(setJump());
+        dispatch(setJump({ untilMs: Date.now() + PLAYER_MOTION.JUMP_DURATION_MS }));
 
         actionTimeoutRef.current = setTimeout(() => {
           dispatch(setRun());
@@ -71,7 +70,7 @@ export function useGameControls(targetRef) {
 
       if (isSlideKey) {
         clearActionTimeout();
-        dispatch(setSlide());
+        dispatch(setSlide({ untilMs: Date.now() + PLAYER_MOTION.SLIDE_DURATION_MS }));
 
         actionTimeoutRef.current = setTimeout(() => {
           dispatch(setRun());
@@ -89,9 +88,7 @@ export function useGameControls(targetRef) {
     };
   }, [dispatch]);
 
-  // -------------------------------------------------------
   // Touch / Pointer controls (swipe)
-  // -------------------------------------------------------
   useEffect(() => {
     const el = targetRef?.current;
     if (!el) return;
@@ -116,7 +113,7 @@ export function useGameControls(targetRef) {
       if (currentAction !== "run") return;
 
       clearActionTimeout();
-      dispatch(setJump());
+      dispatch(setJump({ untilMs: Date.now() + PLAYER_MOTION.JUMP_DURATION_MS }));
 
       actionTimeoutRef.current = setTimeout(() => {
         dispatch(setRun());
@@ -129,7 +126,7 @@ export function useGameControls(targetRef) {
       if (currentAction !== "run") return;
 
       clearActionTimeout();
-      dispatch(setSlide());
+      dispatch(setSlide({ untilMs: Date.now() + PLAYER_MOTION.SLIDE_DURATION_MS }));
 
       actionTimeoutRef.current = setTimeout(() => {
         dispatch(setRun());

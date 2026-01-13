@@ -11,7 +11,14 @@ function laneCenterPx(laneIndex, fieldW) {
   return (laneIndex + 0.5) * laneW;
 }
 
-export default function PlayerActor({ laneIndex, actionState, selectedCatId, fieldW }) {
+export default function PlayerActor({
+  laneIndex,
+  actionState,
+  selectedCatId,
+  fieldW,
+  // ✅ по-настоящему единый rAF: PlayerActor тоже тикает от мира
+  subscribeWorld,
+}) {
   // ✅ во время slide кот рисуется ниже препятствий
   const zIndex = actionState === "slide" ? 4 : 8;
 
@@ -72,15 +79,16 @@ export default function PlayerActor({ laneIndex, actionState, selectedCatId, fie
     const el = wrapperRef.current;
     if (!el) return;
 
-    let mounted = true;
     lastTsRef.current = performance.now();
 
-    const tick = (ts) => {
-      if (!mounted) return;
-
+    const step = (ts, dtOverrideSec) => {
       const w = fieldWRef.current;
 
-      const dt = Math.min(0.05, Math.max(0, (ts - lastTsRef.current) / 1000));
+      const dt =
+        typeof dtOverrideSec === "number"
+          ? Math.min(0.05, Math.max(0, dtOverrideSec))
+          : Math.min(0.05, Math.max(0, (ts - lastTsRef.current) / 1000));
+
       lastTsRef.current = ts;
 
       // --- smooth X ---
@@ -121,7 +129,21 @@ export default function PlayerActor({ laneIndex, actionState, selectedCatId, fie
         // run/slide остаются на земле (слайд не ломаем)
         el.style.bottom = `${ground}px`;
       }
+    };
 
+    // ✅ Основной путь: тик от единого rAF мира
+    if (typeof subscribeWorld === "function") {
+      const unsubscribe = subscribeWorld(({ ts, dt }) => {
+        step(ts, dt);
+      });
+      return unsubscribe;
+    }
+
+    // fallback (если subscribeWorld не передали)
+    let mounted = true;
+    const tick = (ts) => {
+      if (!mounted) return;
+      step(ts, undefined);
       rafRef.current = requestAnimationFrame(tick);
     };
 
@@ -130,7 +152,7 @@ export default function PlayerActor({ laneIndex, actionState, selectedCatId, fie
       mounted = false;
       cancelAnimationFrame(rafRef.current);
     };
-  }, [actionState]);
+  }, [actionState, subscribeWorld]);
 
   const safeLeft =
     fieldW && fieldW > 0 ? `${Math.round(laneCenterPx(laneIndex, fieldW))}px` : "0px";

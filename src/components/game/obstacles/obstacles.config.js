@@ -52,12 +52,12 @@ export const OBSTACLES_CONFIG = {
   MAX_SAME_LANE_STREAK: 2,
 
   // ✅ защищает от "jump -> приземление в sidestep" + от наложений
-  SAME_LANE_MIN_GAP_PX: 280,
+  SAME_LANE_MIN_GAP_PX: 240,
 
   // ✅ защищает от jump <-> slide "впритык"
   // Сделали чуть больше, чтобы игрок физически успевал
   // среагировать (особенно на мобильном свайпом).
-  ACTION_SWITCH_MIN_GAP_PX: 360,
+  ACTION_SWITCH_MIN_GAP_PX: 320,
 
   BASE_SIZE_PX: 32,
 };
