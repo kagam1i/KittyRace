@@ -263,7 +263,7 @@ export default function ObstacleLayer({
 
         const screenY = o.y + offset;
 
-        // ✅ Luna warning (event-based, cooldown в slice)
+        // ✅ Luna warning (event-based, cooldown в slice) — ТЕПЕРЬ "ПО ДЕЛУ"
         if (
           selectedCatId === "luna" &&
           o.lane === laneIndex &&
@@ -273,7 +273,15 @@ export default function ObstacleLayer({
           if (now >= lunaCooldownUntil) {
             const distAhead = playerHitY - screenY; // >0 — obstacle выше и приближается
             if (distAhead > 0 && distAhead < WARN_PX) {
-              dispatch(triggerLunaSense({ now }));
+              const isRealDanger =
+                // needAction: опасно только если действие НЕ то
+                (o.rule === "needAction" && actionState !== o.needAction) ||
+                // sidestep/avoidLane: опасно всегда, если в lane и близко
+                (o.rule === "avoidLane");
+
+              if (isRealDanger) {
+                dispatch(triggerLunaSense({ now }));
+              }
             }
           }
         }

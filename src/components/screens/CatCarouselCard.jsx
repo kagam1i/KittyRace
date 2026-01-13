@@ -75,8 +75,6 @@ export default function CatCarouselCard({
                             )}
                         </div>
 
-
-
                         {/* PRICE + BUY */}
                         {!isUnlocked && (
                             <div className="mt-3 flex items-center justify-between gap-3">
@@ -93,7 +91,8 @@ export default function CatCarouselCard({
                                 </div>
 
                                 <button
-                                    className="ui-btn px-7 py-2"
+                                    key={`${cat?.id}_${canBuy ? "ready" : "locked"}`}
+                                    className={`ui-btn px-7 py-2 ${canBuy ? "ui-buy-ready" : ""}`}
                                     disabled={!canBuy}
                                     onClick={onBuy}
                                     title={canBuy ? "Buy" : "Not enough fish"}
