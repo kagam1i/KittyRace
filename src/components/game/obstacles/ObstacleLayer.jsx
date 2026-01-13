@@ -6,6 +6,8 @@ import { OBSTACLE_TYPES, OBSTACLES_CONFIG } from "./obstacles.config";
 import { tryGameOver, triggerLunaSense } from "../../../features/game/gameSlice";
 import { PLAYER_RENDER } from "../../../config/playerRender";
 
+import { audioManager } from "../../../audio/audioManager";
+
 import {
   fishConflict,
   laneHasEnoughGap,
@@ -48,6 +50,7 @@ export default function ObstacleLayer({
 
   const prevActionRef = useRef(actionState);
 
+  const hitPlayedRef = useRef(false);
 
   const [, bumpRender] = useState(0);
 
@@ -110,6 +113,7 @@ export default function ObstacleLayer({
 
     if (hostRef.current) hostRef.current.style.transform = "translate3d(0px, 0px, 0px)";
     bumpRender((x) => x + 1);
+    hitPlayedRef.current = false;
   }, [runId]);
 
 
@@ -256,6 +260,10 @@ export default function ObstacleLayer({
           if (o.rule === "avoidLane") {
             if (sameLane) {
               o.passed = true;
+              if (!hitPlayedRef.current) {
+                audioManager.playSfx("hit");
+                hitPlayedRef.current = true;
+              }
               dispatch(tryGameOver({ obstacleTypeId: o.typeId }));
               continue;
             }
@@ -270,6 +278,10 @@ export default function ObstacleLayer({
             // не то действие -> смерть
             if (actionState !== o.needAction) {
               o.passed = true;
+              if (!hitPlayedRef.current) {
+                audioManager.playSfx("hit");
+                hitPlayedRef.current = true;
+              }
               dispatch(tryGameOver({ obstacleTypeId: o.typeId }));
               continue;
             }
@@ -282,6 +294,10 @@ export default function ObstacleLayer({
 
               if (justLanded && distAhead >= 0 && distAhead <= TIP_TIP_BAND_PX) {
                 o.passed = true;
+                if (!hitPlayedRef.current) {
+                  audioManager.playSfx("hit");
+                  hitPlayedRef.current = true;
+                }
                 dispatch(tryGameOver({ obstacleTypeId: o.typeId }));
                 continue;
               }

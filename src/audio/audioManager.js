@@ -1,0 +1,157 @@
+// audioManager.js
+// Centralized SFX/music controller.
+//
+// Rules:
+// - No Audio created inside React render.
+// - One-time initialization.
+// - Small pools for SFX (quick repeats without creating new Audio elements).
+//
+// Notes:
+// - Menu music is looped.
+// - Autoplay restrictions mean music can start only after a user gesture.
+//   SoundGate handles the first-gesture unlock.
+
+import uiHoverUrl from "../assets/sound/sfx/ui_hover.wav";
+import uiClickUrl from "../assets/sound/sfx/ui_click.wav";
+import jumpUrl from "../assets/sound/sfx/jump.wav";
+import slideUrl from "../assets/sound/sfx/slide.mp3";
+import sidestepUrl from "../assets/sound/sfx/sidestep.mp3";
+import hitUrl from "../assets/sound/sfx/hit.wav";
+import fishPickupUrl from "../assets/sound/sfx/fish_pickup.wav";
+
+import menuMusicUrl from "../assets/sound/music/menu.mp3";
+
+const SFX_POOL_SIZE = 4;
+
+function makePool(src, { volume = 0.6 } = {}) {
+  const pool = Array.from({ length: SFX_POOL_SIZE }, () => {
+    const a = new Audio(src);
+    a.preload = "auto";
+    a.volume = volume;
+    return a;
+  });
+
+  let idx = 0;
+
+  return {
+    play(enabled) {
+      if (!enabled) return;
+      const a = pool[idx];
+      idx = (idx + 1) % pool.length;
+
+      try {
+        a.currentTime = 0;
+      } catch (_) {
+        // ignore if not seekable yet
+      }
+
+      const p = a.play?.();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    },
+    setMuted(muted) {
+      for (const a of pool) a.muted = muted;
+    },
+  };
+}
+
+class AudioManager {
+  constructor() {
+    this._inited = false;
+    this._enabled = true;
+    this._unlocked = false;
+
+    this._sfx = null;
+    this._menuMusic = null;
+  }
+
+  initOnce() {
+    if (this._inited) return;
+
+    // Keep volumes soft / unobtrusive
+    this._sfx = {
+      uiHover: makePool(uiHoverUrl, { volume: 0.35 }),
+      uiClick: makePool(uiClickUrl, { volume: 0.45 }),
+      jump: makePool(jumpUrl, { volume: 0.5 }),
+      slide: makePool(slideUrl, { volume: 0.5 }),
+      sidestep: makePool(sidestepUrl, { volume: 0.45 }),
+      hit: makePool(hitUrl, { volume: 0.55 }),
+      fishPickup: makePool(fishPickupUrl, { volume: 0.5 }),
+    };
+
+    const music = new Audio(menuMusicUrl);
+    music.preload = "auto";
+    music.loop = true;
+    music.volume = 0.25;
+    this._menuMusic = music;
+
+    this._applyMuteState();
+
+    this._inited = true;
+  }
+
+  setEnabled(enabled) {
+    this._enabled = Boolean(enabled);
+    this.initOnce();
+    this._applyMuteState();
+
+    if (!this._enabled) {
+      this.stopMenuMusic();
+    }
+  }
+
+  // Called after the first user gesture to satisfy autoplay policy.
+  unlock() {
+    this.initOnce();
+    this._unlocked = true;
+  }
+
+  get unlocked() {
+    return this._unlocked;
+  }
+
+  _applyMuteState() {
+    const muted = !this._enabled;
+
+    if (this._sfx) {
+      for (const key of Object.keys(this._sfx)) {
+        this._sfx[key].setMuted(muted);
+      }
+    }
+
+    if (this._menuMusic) {
+      this._menuMusic.muted = muted;
+    }
+  }
+
+  playSfx(name) {
+    this.initOnce();
+    const sfx = this._sfx?.[name];
+    if (!sfx) return;
+    sfx.play(this._enabled);
+  }
+
+  playMenuMusic() {
+    this.initOnce();
+    if (!this._enabled) return;
+    if (!this._unlocked) return;
+
+    const a = this._menuMusic;
+    if (!a) return;
+    if (!a.paused) return;
+
+    const p = a.play?.();
+    if (p && typeof p.catch === "function") p.catch(() => {});
+  }
+
+  stopMenuMusic() {
+    this.initOnce();
+    const a = this._menuMusic;
+    if (!a) return;
+    try {
+      a.pause();
+      a.currentTime = 0;
+    } catch (_) {}
+  }
+}
+
+export const audioManager = new AudioManager();

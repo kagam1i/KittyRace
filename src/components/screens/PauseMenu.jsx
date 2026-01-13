@@ -3,6 +3,8 @@ import { resumeGame, goToGameMenu } from "../../features/game/gameSlice";
 
 import backgroundImg from "../../assets/background.png";
 
+import { audioManager } from "../../audio/audioManager";
+
 /**
  * PauseMenu
  * - overlay поверх GameScreen
@@ -44,14 +46,22 @@ export function PauseMenu() {
           <div className="mt-10 grid gap-4 place-items-center">
             <button
               className="ui-btn-primary px-10 py-3 text-lg"
-              onClick={() => dispatch(resumeGame())}
+              onPointerEnter={() => audioManager.playSfx("uiHover")}
+              onClick={() => {
+                audioManager.playSfx("uiClick");
+                dispatch(resumeGame());
+              }}
             >
               continue
             </button>
 
             <button
               className="ui-btn-ghost px-10 py-3 text-lg"
-              onClick={() => dispatch(goToGameMenu())}
+              onPointerEnter={() => audioManager.playSfx("uiHover")}
+              onClick={() => {
+                audioManager.playSfx("uiClick");
+                dispatch(goToGameMenu());
+              }}
             >
               main menu
             </button>

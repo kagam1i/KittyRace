@@ -15,6 +15,8 @@ import lunaPreview from "../../assets/sprites/preview/luna.png";
 import soundOnIcon from "../../assets/sound/sound_on.png";
 import soundOffIcon from "../../assets/sound/sound_off.png";
 
+import { audioManager } from "../../audio/audioManager";
+
 // fish
 import fishIcon from "../../assets/environment/fish.png";
 
@@ -133,7 +135,11 @@ export function MainMenu() {
           <div className="absolute top-6 left-6 ui-fade-in ui-delay-1">
             <button
               className="ui-icon-btn"
-              onClick={() => dispatch(toggleSound())}
+              onPointerEnter={() => audioManager.playSfx("uiHover")}
+              onClick={() => {
+                if (soundEnabled) audioManager.playSfx("uiClick");
+                dispatch(toggleSound());
+              }}
               aria-label={soundEnabled ? "Sound on" : "Sound off"}
             >
               <img
@@ -182,7 +188,11 @@ export function MainMenu() {
             <div className="ui-fade-in ui-delay-2 pointer-events-auto">
               <button
                 className="ui-btn-primary px-10 py-3 text-lg"
-                onClick={onStart}
+                onPointerEnter={() => audioManager.playSfx("uiHover")}
+                onClick={() => {
+                  if (isUnlocked) audioManager.playSfx("uiClick");
+                  onStart();
+                }}
                 title={!isUnlocked ? "Cat is locked" : "Start"}
               >
                 START

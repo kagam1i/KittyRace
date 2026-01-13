@@ -7,6 +7,8 @@ import { FISH_CONFIG } from "./fish.config";
 import { addFish } from "../../../features/game/gameSlice";
 import { PLAYER_RENDER } from "../../../config/playerRender";
 
+import { audioManager } from "../../../audio/audioManager";
+
 import { randInt, makeId, clamp } from "./fish.utils";
 import {
   fishBlockedBySidestep,
@@ -240,6 +242,7 @@ export default function FishLayer({
           f.pickedAtMs = t;
           f.popDurationMs = computePopDurationMs();
 
+          audioManager.playSfx("fishPickup");
           dispatch(addFish(1));
           mutated = true;
         }

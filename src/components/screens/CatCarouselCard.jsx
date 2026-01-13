@@ -1,3 +1,5 @@
+import { audioManager } from "../../audio/audioManager";
+
 export default function CatCarouselCard({
     cat,
     previewSrc,
@@ -17,7 +19,11 @@ export default function CatCarouselCard({
             {/* LEFT ARROW */}
             <button
                 className="ui-arrow-btn"
-                onClick={onPrev}
+                onPointerEnter={() => audioManager.playSfx("uiHover")}
+                onClick={() => {
+                    audioManager.playSfx("uiClick");
+                    onPrev?.();
+                }}
                 aria-label="Previous cat"
                 title="Previous"
             >
@@ -94,7 +100,11 @@ export default function CatCarouselCard({
                                     key={`${cat?.id}_${canBuy ? "ready" : "locked"}`}
                                     className={`ui-btn px-7 py-2 ${canBuy ? "ui-buy-ready" : ""}`}
                                     disabled={!canBuy}
-                                    onClick={onBuy}
+                                    onPointerEnter={() => audioManager.playSfx("uiHover")}
+                                    onClick={() => {
+                                        audioManager.playSfx("uiClick");
+                                        onBuy?.();
+                                    }}
                                     title={canBuy ? "Buy" : "Not enough fish"}
                                 >
                                     BUY
@@ -108,7 +118,11 @@ export default function CatCarouselCard({
             {/* RIGHT ARROW */}
             <button
                 className="ui-arrow-btn"
-                onClick={onNext}
+                onPointerEnter={() => audioManager.playSfx("uiHover")}
+                onClick={() => {
+                    audioManager.playSfx("uiClick");
+                    onNext?.();
+                }}
                 aria-label="Next cat"
                 title="Next"
             >

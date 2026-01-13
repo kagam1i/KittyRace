@@ -5,6 +5,8 @@
 
 import { useSelector } from "react-redux";
 
+import { SoundGate } from "../audio/SoundGate";
+
 import { MainMenu } from "../components/screens/MainMenu";
 import { GameScreen } from "../components/screens/GameScreen";
 import { PauseMenu } from "../components/screens/PauseMenu";
@@ -13,18 +15,21 @@ import { GameOverMenu } from "../components/screens/GameOverMenu";
 export const GameRoot = () => {
   const gameStatus = useSelector((state) => state.game.status);
 
+  let content;
+
   // Меню — отдельный экран (как было)
-  if (gameStatus === "menu") return <MainMenu />;
+  if (gameStatus === "menu") content = <MainMenu />;
+  else if (gameStatus === "gameover") content = <GameOverMenu />;
+  else {
+    // ✅ Во всех остальных состояниях держим GameScreen смонтированным
+    content = (
+      <div className="relative">
+        <GameScreen />
 
-  if (gameStatus === "gameover") return <GameOverMenu />;
+        {gameStatus === "paused" && <PauseMenu />}
+      </div>
+    );
+  }
 
-
-  // ✅ Во всех остальных состояниях держим GameScreen смонтированным
-  return (
-    <div className="relative">
-      <GameScreen />
-
-      {gameStatus === "paused" && <PauseMenu />}
-    </div>
-  );
+  return <SoundGate>{content}</SoundGate>;
 };

@@ -4,6 +4,8 @@ import { startGame, goToGameMenu } from "../../features/game/gameSlice";
 import backgroundImg from "../../assets/background.png";
 import fishIcon from "../../assets/environment/fish.png";
 
+import { audioManager } from "../../audio/audioManager";
+
 /**
  * GameOverMenu
  * - “табличка” (ui-board)
@@ -58,14 +60,22 @@ export function GameOverMenu() {
           <div className="mt-10 grid gap-4 place-items-center">
             <button
               className="ui-btn-primary px-10 py-3 text-lg"
-              onClick={() => dispatch(startGame())}
+              onPointerEnter={() => audioManager.playSfx("uiHover")}
+              onClick={() => {
+                audioManager.playSfx("uiClick");
+                dispatch(startGame());
+              }}
             >
               restart
             </button>
 
             <button
               className="ui-btn-ghost px-10 py-3 text-lg"
-              onClick={() => dispatch(goToGameMenu())}
+              onPointerEnter={() => audioManager.playSfx("uiHover")}
+              onClick={() => {
+                audioManager.playSfx("uiClick");
+                dispatch(goToGameMenu());
+              }}
             >
               main menu
             </button>

@@ -12,6 +12,8 @@ import {
 
 import { PLAYER_MOTION } from "../../../config/playerMotion";
 
+import { audioManager } from "../../../audio/audioManager";
+
 export function useGameControls(targetRef) {
   const dispatch = useDispatch();
   const actionState = useSelector((s) => s.game.actionState);
@@ -35,11 +37,13 @@ export function useGameControls(targetRef) {
       const key = e.key;
 
       if (key === "ArrowLeft" || key === "a" || key === "ф") {
+        audioManager.playSfx("sidestep");
         dispatch(moveLeft());
         return;
       }
 
       if (key === "ArrowRight" || key === "d" || key === "в") {
+        audioManager.playSfx("sidestep");
         dispatch(moveRight());
         return;
       }
@@ -58,6 +62,8 @@ export function useGameControls(targetRef) {
 
       if (isJumpKey) {
         clearActionTimeout();
+        audioManager.playSfx("jump");
+
         dispatch(setJump({ untilMs: Date.now() + PLAYER_MOTION.JUMP_DURATION_MS }));
 
         actionTimeoutRef.current = setTimeout(() => {
@@ -70,6 +76,8 @@ export function useGameControls(targetRef) {
 
       if (isSlideKey) {
         clearActionTimeout();
+        audioManager.playSfx("slide");
+
         dispatch(setSlide({ untilMs: Date.now() + PLAYER_MOTION.SLIDE_DURATION_MS }));
 
         actionTimeoutRef.current = setTimeout(() => {
@@ -113,6 +121,7 @@ export function useGameControls(targetRef) {
       if (currentAction !== "run") return;
 
       clearActionTimeout();
+      audioManager.playSfx("jump");
       dispatch(setJump({ untilMs: Date.now() + PLAYER_MOTION.JUMP_DURATION_MS }));
 
       actionTimeoutRef.current = setTimeout(() => {
@@ -126,6 +135,7 @@ export function useGameControls(targetRef) {
       if (currentAction !== "run") return;
 
       clearActionTimeout();
+      audioManager.playSfx("slide");
       dispatch(setSlide({ untilMs: Date.now() + PLAYER_MOTION.SLIDE_DURATION_MS }));
 
       actionTimeoutRef.current = setTimeout(() => {
@@ -163,6 +173,7 @@ export function useGameControls(targetRef) {
       if (Math.max(absX, absY) < SWIPE_MIN_PX) return;
 
       if (absX > absY) {
+        audioManager.playSfx("sidestep");
         if (dx < 0) dispatch(moveLeft());
         else dispatch(moveRight());
       } else {
