@@ -18,6 +18,7 @@ export default function RoadsideDecorLayer({
   side,
   scrollSpeedRef,
   status,
+  runId,
   shoulderW,
   subscribeWorld,
   worldOffsetRef,
@@ -105,7 +106,7 @@ export default function RoadsideDecorLayer({
     scrollOffsetRef.current = 0;
     if (hostRef.current) hostRef.current.style.transform = "translate3d(0px, 0px, 0px)";
     bumpRender((x) => x + 1);
-  }, [hostH, side, status]);
+  }, [hostH, side, runId]);
 
   useEffect(() => {
     if (!hostH) return;

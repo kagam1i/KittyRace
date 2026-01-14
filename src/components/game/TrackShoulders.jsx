@@ -10,7 +10,15 @@ import {
 
 import RoadsideDecorLayer from "./roadsideDecor/RoadsideDecorLayer";
 
-export function TrackShoulder({ fieldPx, side, status, scrollSpeedRef, worldOffsetRef, subscribeWorld }) {
+export function TrackShoulder({
+  fieldPx,
+  side,
+  status,
+  runId,
+  scrollSpeedRef,
+  worldOffsetRef,
+  subscribeWorld,
+}) {
   const layerRef = useRef(null);
 
   const img = side === "left" ? leftImg : rightImg;
@@ -28,7 +36,6 @@ export function TrackShoulder({ fieldPx, side, status, scrollSpeedRef, worldOffs
     if (!el) return;
     if (status !== "running") return;
 
-    // Единый rAF живёт в useWorldSnapshot. Обочина просто читает общий offset.
     if (typeof subscribeWorld === "function") {
       const unsubscribe = subscribeWorld(({ worldOffsetPx }) => {
         const looped = tileHeightPx > 0 ? worldOffsetPx % tileHeightPx : 0;
@@ -37,7 +44,6 @@ export function TrackShoulder({ fieldPx, side, status, scrollSpeedRef, worldOffs
       return unsubscribe;
     }
 
-    // fallback
     let raf = 0;
     let last = performance.now();
     let offset = 0;
@@ -76,6 +82,7 @@ export function TrackShoulder({ fieldPx, side, status, scrollSpeedRef, worldOffs
         scrollSpeedRef={scrollSpeedRef}
         worldOffsetRef={worldOffsetRef}
         status={status}
+        runId={runId}
         shoulderW={shoulderW}
         subscribeWorld={subscribeWorld}
       />

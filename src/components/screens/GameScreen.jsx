@@ -77,6 +77,7 @@ export function GameScreen() {
                   fieldPx={fieldPx}
                   side="left"
                   status={status}
+                  runId={runId}
                   scrollSpeedRef={scrollSpeedRef}
                   worldOffsetRef={worldOffsetRef}
                   subscribeWorld={subscribe}
@@ -145,6 +146,7 @@ export function GameScreen() {
                   fieldPx={fieldPx}
                   side="right"
                   status={status}
+                  runId={runId}
                   scrollSpeedRef={scrollSpeedRef}
                   worldOffsetRef={worldOffsetRef}
                   subscribeWorld={subscribe}

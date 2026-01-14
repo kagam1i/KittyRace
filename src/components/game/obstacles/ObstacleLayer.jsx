@@ -269,6 +269,7 @@ export default function ObstacleLayer({
       }
 
       const playerHitY = fieldH - PLAYER_RENDER.GROUND_BOTTOM_PX - 10;
+      const TIP_TIP_BAND_PX = 12;
       const WARN_PX = 240;
 
       const loaded = loadedRef.current;
@@ -294,8 +295,17 @@ export default function ObstacleLayer({
         // если препятствие уже прошло кота (позади), в этом тике НЕ убиваем.
         const distAhead = playerHitY - screenY; // >0 значит препятствие впереди
         if (distAhead < 0) {
-          o.passed = true;
-          continue;
+          const isJumpTipCase =
+            justLanded &&
+            o.rule === "needAction" &&
+            o.needAction === "jump" &&
+            o.lane === laneIndex &&
+            distAhead >= -TIP_TIP_BAND_PX;
+
+          if (!isJumpTipCase) {
+            o.passed = true;
+            continue;
+          }
         }
 
         // Если препятствие уже далеко позади — считаем пройденным
@@ -389,7 +399,7 @@ export default function ObstacleLayer({
               const distAhead = playerHitY - screenY;
               const TIP_TIP_BAND_PX = 10;
 
-              if (justLanded && distAhead >= 0 && distAhead <= TIP_TIP_BAND_PX) {
+              if (justLanded && distAhead >= -TIP_TIP_BAND_PX && distAhead <= TIP_TIP_BAND_PX) {
                 o.passed = true;
                 if (!hitPlayedRef.current) {
                   audioManager.playSfx("hit");
