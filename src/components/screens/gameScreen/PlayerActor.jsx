@@ -20,7 +20,7 @@ export default function PlayerActor({
   subscribeWorld,
 }) {
   // ✅ во время slide кот рисуется ниже препятствий
-  const zIndex = actionState === "slide" ? 4 : 8;
+const zIndex = actionState === "slide" ? 8 : 8;
 
   const wrapperRef = useRef(null);
 

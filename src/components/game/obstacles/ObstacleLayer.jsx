@@ -484,12 +484,14 @@ export default function ObstacleLayer({
       {obstaclesRef.current.map((o) => (
         <ObstacleSprite
           key={o.id}
-          src={o.img}
+          src={o.src}
           x={o.x}
           y={o.y}
-          sizePx={OBSTACLES_CONFIG.BASE_SIZE_PX}
-          scale={maxScale}
+          sizePx={o.sizePx}
+          scale={o.scale}
+          typeId={o.typeId} // ✅ безопасно
         />
+
       ))}
     </div>
   );
