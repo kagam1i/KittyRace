@@ -16,21 +16,27 @@ import {
   hasTooCloseFishSameLane,
 } from "./fish.spawnRules";
 
+import { getObstacleBoundsPx } from "../obstacles/obstacleBounds";
+
 export default function FishLayer({
   fieldW,
   fieldH,
   scrollSpeedRef,
   worldOffsetRef,
   subscribeWorld,
-  getObstacles, // должен вернуть obstacle snapshot (y = screenY)
+  getObstacles, // obstacle snapshot: { typeId, lane, y(screenPx), ... }
   setFishSnapshotGetter,
 }) {
   const dispatch = useDispatch();
   const status = useSelector((s) => s.game.status);
   const laneIndex = useSelector((s) => s.game.laneIndex);
   const runId = useSelector((s) => s.game.runId);
+  const actionState = useSelector((s) => s.game.actionState);
 
-  const hostRef = useRef(null);
+  // 2 слоя, чтобы можно было рисовать рыбу "под slide"
+  const hostUnderRef = useRef(null);
+  const hostOverRef = useRef(null);
+
   const localOffsetRef = useRef(0);
 
   const fishRef = useRef([]);
@@ -49,7 +55,11 @@ export default function FishLayer({
       FISH_CONFIG.SPAWN_GAP_PX.max
     );
 
-    if (hostRef.current) hostRef.current.style.transform = "translate3d(0px,0px,0px)";
+    if (hostUnderRef.current)
+      hostUnderRef.current.style.transform = "translate3d(0px,0px,0px)";
+    if (hostOverRef.current)
+      hostOverRef.current.style.transform = "translate3d(0px,0px,0px)";
+
     bumpRender((x) => x + 1);
   }, [runId]);
 
@@ -65,7 +75,6 @@ export default function FishLayer({
   useEffect(() => {
     if (!setFishSnapshotGetter) return;
 
-    // Наружу отдаём screenY, чтобы ObstacleLayer мог проверять конфликты корректно.
     setFishSnapshotGetter(() => {
       return () => {
         const offset = getOffsetRenderPx();
@@ -95,7 +104,6 @@ export default function FishLayer({
     return clamp(s, 0.85, FISH_CONFIG.SCALE);
   }, [laneW]);
 
-  // gap для sidestep-блокировки
   const screenType = useMemo(() => {
     const bp = FISH_CONFIG.SCREEN_BREAKPOINTS_PX ?? { mobileMax: 479, tabletMax: 899 };
     if (fieldW <= bp.mobileMax) return "mobile";
@@ -135,6 +143,39 @@ export default function FishLayer({
     });
   }
 
+  // ✅ ВАЖНО: underSlide считаем в момент спавна (в screen координатах),
+  // чтобы рыба сразу попадала в нужный слой и НЕ "перескакивала" кадром позже.
+  function computeUnderSlideAtSpawn({ lane, yWorld, offsetFloat }) {
+    if (typeof getObstacles !== "function") return false;
+    const obstacles = getObstacles();
+    if (!Array.isArray(obstacles) || obstacles.length === 0) return false;
+
+    const fishSizePx = FISH_CONFIG.SIZE_PX * fishScale;
+    const fishHalf = fishSizePx / 2;
+
+    const fishScreenY = yWorld + offsetFloat;
+    const fishTop = fishScreenY - fishHalf;
+    const fishBottom = fishScreenY + fishHalf;
+
+    // чуть расширим bounds, чтобы пиксель-арт выглядел стабильно
+    const SLIDE_PAD_PX = 2;
+
+    for (const o of obstacles) {
+      if (!o || o.typeId !== "slide") continue;
+      if (o.lane !== lane) continue;
+      if (typeof o.y !== "number") continue;
+
+      const b = getObstacleBoundsPx({ typeId: o.typeId, laneW, yPx: o.y });
+
+      const top = Math.round(b.top) - SLIDE_PAD_PX;
+      const bottom = Math.round(b.bottom) + SLIDE_PAD_PX;
+
+      if (fishBottom > top && fishTop < bottom) return true;
+    }
+
+    return false;
+  }
+
   function spawnFish(yWorld, nowMs) {
     const offsetFloat = getOffsetFloat();
 
@@ -161,6 +202,8 @@ export default function FishLayer({
         continue;
       }
 
+      const underSlide = computeUnderSlideAtSpawn({ lane, yWorld, offsetFloat });
+
       fishRef.current.push({
         id: makeId(),
         lane,
@@ -170,6 +213,7 @@ export default function FishLayer({
         pickedAtMs: 0,
         popDurationMs: POP_BASE_MS,
         hidden: false,
+        underSlide,
       });
 
       return;
@@ -196,7 +240,6 @@ export default function FishLayer({
     const step = ({ t, dt, speed, worldOffsetPx }) => {
       const dy = (speed ?? 0) * (dt ?? 0);
 
-      // Если общий worldOffset не используется — ведём локальный.
       if (typeof worldOffsetRef?.current !== "number") {
         localOffsetRef.current += dy;
       }
@@ -205,13 +248,15 @@ export default function FishLayer({
         typeof worldOffsetPx === "number" ? worldOffsetPx : getOffsetFloat();
       const offsetPx = Math.round(offsetFloat);
 
-      if (hostRef.current) {
-        hostRef.current.style.transform = `translate3d(0px, ${offsetPx}px, 0px)`;
+      if (hostUnderRef.current) {
+        hostUnderRef.current.style.transform = `translate3d(0px, ${offsetPx}px, 0px)`;
+      }
+      if (hostOverRef.current) {
+        hostOverRef.current.style.transform = `translate3d(0px, ${offsetPx}px, 0px)`;
       }
 
       let mutated = false;
 
-      // Мягкая страховка, пока рыбы ещё не в кадре
       if (
         cullInvisibleConflicts({
           fishList: fishRef.current,
@@ -223,11 +268,9 @@ export default function FishLayer({
         mutated = true;
       }
 
-      // pickup
       for (const f of fishRef.current) {
         if (f.hidden || f.picked) continue;
 
-        // ✅ хитбокс синхронизирован с отрисовкой (offsetPx)
         const screenY = f.y + offsetPx;
 
         if (
@@ -244,7 +287,6 @@ export default function FishLayer({
         }
       }
 
-      // remove
       const beforeLen = fishRef.current.length;
       fishRef.current = fishRef.current.filter((f) => {
         if (f.hidden) return false;
@@ -253,7 +295,6 @@ export default function FishLayer({
       });
       if (fishRef.current.length !== beforeLen) mutated = true;
 
-      // spawn
       nextSpawnPxRef.current -= dy;
       if (nextSpawnPxRef.current <= 0) {
         spawnFish(-40 - offsetFloat, t);
@@ -289,25 +330,55 @@ export default function FishLayer({
     getObstacles,
   ]);
 
+  // ✅ во время slide кот уходит на zIndex=4, поэтому рыбу тоже опускаем ниже, чтобы не лежала "на коте"
+  const fishZUnder = actionState === "slide" ? 3 : 5;
+  const fishZOver = actionState === "slide" ? 3 : 7;
+
   return (
-    <div
-      ref={hostRef}
-      className="absolute inset-0 pointer-events-none"
-      style={{ zIndex: 7, willChange: "transform" }}
-    >
-      {fishRef.current.map((f) => (
-        <FishSprite
-          key={f.id}
-          src={FISH_CONFIG.IMAGE}
-          x={f.x}
-          y={f.y}
-          sizePx={FISH_CONFIG.SIZE_PX}
-          scale={fishScale}
-          picked={f.picked}
-          culled={f.hidden}
-          popDurationMs={f.popDurationMs}
-        />
-      ))}
-    </div>
+    <>
+      <div
+        ref={hostUnderRef}
+        className="absolute inset-0 pointer-events-none"
+        style={{ zIndex: fishZUnder, willChange: "transform" }}
+      >
+        {fishRef.current
+          .filter((f) => f?.underSlide)
+          .map((f) => (
+            <FishSprite
+              key={f.id}
+              src={FISH_CONFIG.IMAGE}
+              x={f.x}
+              y={f.y}
+              sizePx={FISH_CONFIG.SIZE_PX}
+              scale={fishScale}
+              picked={f.picked}
+              culled={f.hidden}
+              popDurationMs={f.popDurationMs}
+            />
+          ))}
+      </div>
+
+      <div
+        ref={hostOverRef}
+        className="absolute inset-0 pointer-events-none"
+        style={{ zIndex: fishZOver, willChange: "transform" }}
+      >
+        {fishRef.current
+          .filter((f) => !f?.underSlide)
+          .map((f) => (
+            <FishSprite
+              key={f.id}
+              src={FISH_CONFIG.IMAGE}
+              x={f.x}
+              y={f.y}
+              sizePx={FISH_CONFIG.SIZE_PX}
+              scale={fishScale}
+              picked={f.picked}
+              culled={f.hidden}
+              popDurationMs={f.popDurationMs}
+            />
+          ))}
+      </div>
+    </>
   );
 }
