@@ -487,9 +487,9 @@ export default function ObstacleLayer({
           src={o.src}
           x={o.x}
           y={o.y}
-          sizePx={o.sizePx}
-          scale={o.scale}
-          typeId={o.typeId} // ✅ безопасно
+          sizePx={o.sizePx ?? OBSTACLES_CONFIG.BASE_SIZE_PX}
+          scale={o.scale ?? OBSTACLES_CONFIG.SCALE}
+          typeId={o.typeId}
         />
 
       ))}
