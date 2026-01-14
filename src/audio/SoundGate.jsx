@@ -6,6 +6,9 @@ import { audioManager } from "./audioManager";
 // - Single place that binds Redux state -> audioManager
 // - Also performs one-time audio unlock on the first user gesture
 
+const MENU_MUSIC_VOL = 0.05;
+const GAME_MUSIC_VOL = 0.05;
+
 export function SoundGate({ children }) {
   const soundEnabled = useSelector((s) => s.settings.soundEnabled);
   const gameStatus = useSelector((s) => s.game.status);
@@ -23,12 +26,12 @@ export function SoundGate({ children }) {
     if (!soundEnabled) return;
 
     if (gameStatus === "menu") {
-      audioManager.playMenuMusic({ volume: 0.07 });
+      audioManager.playMenuMusic({ volume: MENU_MUSIC_VOL });
       return;
     }
 
     if (gameStatus === "running" || gameStatus === "paused") {
-      audioManager.playGameMusic({ volume: 0.07 });
+      audioManager.playGameMusic({ volume: GAME_MUSIC_VOL });
       return;
     }
 
@@ -41,9 +44,14 @@ export function SoundGate({ children }) {
     function unlockOnce() {
       audioManager.unlock();
 
-      // If we are already in menu and sound is enabled - try to start music now
+      // Если мы уже в меню и звук включён — стартуем музыку СРАЗУ с нужной громкостью
       if (soundEnabled && gameStatus === "menu") {
-        audioManager.playMenuMusic();
+        audioManager.playMenuMusic({ volume: MENU_MUSIC_VOL });
+      }
+
+      // Если пользователь сделал первый жест уже во время забега/паузы — тоже применим нужную громкость
+      if (soundEnabled && (gameStatus === "running" || gameStatus === "paused")) {
+        audioManager.playGameMusic({ volume: GAME_MUSIC_VOL });
       }
 
       window.removeEventListener("pointerdown", unlockOnce);

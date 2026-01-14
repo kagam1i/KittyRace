@@ -62,6 +62,64 @@ class AudioManager {
 
     this._sfx = null;
     this._menuMusic = null;
+
+    // WebAudio for instant UI feedback (reduces click/hover latency)
+    this._uiCtx = null;
+    this._uiBuffers = { uiClick: null, uiHover: null };
+    this._uiGain = null;
+  }
+
+  async _initUiWebAudio() {
+    // Only needed for UI sounds; keep everything else on <audio> pools.
+    if (this._uiCtx || typeof window === "undefined") return;
+
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+
+    try {
+      this._uiCtx = new Ctx();
+      this._uiGain = this._uiCtx.createGain();
+      this._uiGain.gain.value = 1;
+      this._uiGain.connect(this._uiCtx.destination);
+    } catch (_) {
+      this._uiCtx = null;
+      this._uiGain = null;
+      return;
+    }
+
+    const decode = async (url) => {
+      const res = await fetch(url);
+      const buf = await res.arrayBuffer();
+      return await this._uiCtx.decodeAudioData(buf);
+    };
+
+    // Pre-decode to avoid the first-click delay.
+    try {
+      const [clickBuf, hoverBuf] = await Promise.all([
+        decode(uiClickUrl),
+        decode(uiHoverUrl),
+      ]);
+      this._uiBuffers.uiClick = clickBuf;
+      this._uiBuffers.uiHover = hoverBuf;
+    } catch (_) {
+      // If decoding fails, we'll silently fall back to the <audio> pools.
+    }
+  }
+
+  _playUiWebAudio(name) {
+    if (!this._uiCtx || !this._uiGain) return false;
+    const buffer = this._uiBuffers?.[name];
+    if (!buffer) return false;
+
+    try {
+      const src = this._uiCtx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(this._uiGain);
+      src.start(0);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   initOnce() {
@@ -100,6 +158,16 @@ class AudioManager {
   unlock() {
     this.initOnce();
     this._unlocked = true;
+
+    // After the first user gesture we can safely create/resume AudioContext
+    // and pre-decode UI sounds to remove perceived latency.
+    void this._initUiWebAudio().then(async () => {
+      try {
+        if (this._uiCtx?.state === "suspended") {
+          await this._uiCtx.resume();
+        }
+      } catch (_) {}
+    });
   }
 
   get unlocked() {
@@ -122,9 +190,17 @@ class AudioManager {
 
   playSfx(name) {
     this.initOnce();
+    if (!this._enabled) return;
+
+    // UI sounds via WebAudio for immediate response; fallback to pool.
+    if (name === "uiClick" || name === "uiHover") {
+      const played = this._playUiWebAudio(name);
+      if (played) return;
+    }
+
     const sfx = this._sfx?.[name];
     if (!sfx) return;
-    sfx.play(this._enabled);
+    sfx.play(true);
   }
 
   // Menu + gameplay use the same track; we only change volume by context.
