@@ -210,8 +210,7 @@ export const {
 export const tryGameOver = ({ obstacleTypeId }) => (dispatch, getState) => {
   const s = getState().game;
 
-  // защита: если уже gameover — не делаем ничего
-  if (s.status === "gameover") return;
+  if (s.status === "gameover") return false;
 
   const isBruno = s.selectedCatId === "bruno";
 
@@ -226,16 +225,16 @@ export const tryGameOver = ({ obstacleTypeId }) => (dispatch, getState) => {
     const current = s.fishCount ?? 0;
     const penalty = Math.floor(current * 0.2);
 
-    // ✅ ключевая часть: только если penalty > 0
     if (penalty > 0) {
       dispatch(applyRunFishPenalty({ amount: penalty }));
     }
 
     dispatch(markBrunoSecondChanceUsed());
-    return;
+    return false;
   }
 
   dispatch(gameOver());
+  return true;
 };
 
 export default gameSlice.reducer;

@@ -356,11 +356,16 @@ export default function ObstacleLayer({
               }
 
               o.passed = true;
-              if (!hitPlayedRef.current) {
+
+              const didGameOver = dispatch(
+                tryGameOver({ obstacleTypeId: o.typeId })
+              );
+
+              if (didGameOver && !hitPlayedRef.current) {
                 audioManager.playSfx("hit");
                 hitPlayedRef.current = true;
               }
-              dispatch(tryGameOver({ obstacleTypeId: o.typeId }));
+
               continue;
             }
 
@@ -387,11 +392,16 @@ export default function ObstacleLayer({
 
             if (actionState !== o.needAction) {
               o.passed = true;
-              if (!hitPlayedRef.current) {
+
+              const didGameOver = dispatch(
+                tryGameOver({ obstacleTypeId: o.typeId })
+              );
+
+              if (didGameOver && !hitPlayedRef.current) {
                 audioManager.playSfx("hit");
                 hitPlayedRef.current = true;
               }
-              dispatch(tryGameOver({ obstacleTypeId: o.typeId }));
+
               continue;
             }
 
@@ -401,11 +411,16 @@ export default function ObstacleLayer({
 
               if (justLanded && distAhead >= -TIP_TIP_BAND_PX && distAhead <= TIP_TIP_BAND_PX) {
                 o.passed = true;
-                if (!hitPlayedRef.current) {
+
+                const didGameOver = dispatch(
+                  tryGameOver({ obstacleTypeId: o.typeId })
+                );
+
+                if (didGameOver && !hitPlayedRef.current) {
                   audioManager.playSfx("hit");
                   hitPlayedRef.current = true;
                 }
-                dispatch(tryGameOver({ obstacleTypeId: o.typeId }));
+
                 continue;
               }
 
