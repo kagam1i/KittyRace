@@ -12,6 +12,8 @@ export default function ObstacleSprite({
     <img
       src={src}
       alt=""
+      loading="eager"
+      decoding="async"
       draggable="false"
       style={{
         position: "absolute",

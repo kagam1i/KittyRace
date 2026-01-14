@@ -16,6 +16,28 @@ import {
 
 import { randInt, pickWeighted, makeId, normalizeTypeId } from "./obstacles.utils";
 
+// Прогрев + учёт статуса загрузки спрайтов, чтобы не было "невидимых" препятствий.
+function preloadObstacleImages({ allSrc, preloaded, loaded, broken }) {
+  for (const src of allSrc) {
+    if (!src || preloaded.has(src)) continue;
+    preloaded.add(src);
+
+    const img = new Image();
+    img.decoding = "async";
+
+    img.onload = () => {
+      loaded.add(src);
+    };
+
+    img.onerror = () => {
+      broken.add(src);
+      // Важно: чтобы не зависнуть в "не загружено", считаем это тоже финальным статусом.
+      loaded.add(src);
+    };
+
+    img.src = src;
+  }
+}
 
 export default function ObstacleLayer({
   fieldW,
@@ -49,8 +71,12 @@ export default function ObstacleLayer({
   );
 
   const prevActionRef = useRef(actionState);
-
   const hitPlayedRef = useRef(false);
+
+  // Кэши загрузки спрайтов препятствий (фикс “невидимого” game over).
+  const preloadedRef = useRef(new Set());
+  const loadedRef = useRef(new Set());
+  const brokenRef = useRef(new Set());
 
   const [, bumpRender] = useState(0);
 
@@ -97,18 +123,23 @@ export default function ObstacleLayer({
   }, [setObstacleSnapshotGetter]);
 
   useEffect(() => {
+    // Прогреваем все спрайты препятствий в начале забега.
+    const allSrc = Object.values(OBSTACLE_TYPES).flatMap((t) => t?.images ?? []);
+    preloadObstacleImages({
+      allSrc,
+      preloaded: preloadedRef.current,
+      loaded: loadedRef.current,
+      broken: brokenRef.current,
+    });
+
     obstaclesRef.current = [];
     lastTimeRef.current = 0;
     localOffsetRef.current = 0;
 
     // ✅ чтобы в начале забега трасса не была пустой:
     // первый спавн делаем заметно быстрее, чем обычный gap.
-    // Дальше используется стандартный SPAWN_GAP_PX.
     const firstMin = Math.max(20, Math.floor(OBSTACLES_CONFIG.SPAWN_GAP_PX.min * 0.25));
-    const firstMax = Math.max(
-      firstMin + 10,
-      Math.floor(OBSTACLES_CONFIG.SPAWN_GAP_PX.min * 0.55)
-    );
+    const firstMax = Math.max(firstMin + 10, Math.floor(OBSTACLES_CONFIG.SPAWN_GAP_PX.min * 0.55));
     nextSpawnPxRef.current = randInt(firstMin, firstMax);
 
     if (hostRef.current) hostRef.current.style.transform = "translate3d(0px, 0px, 0px)";
@@ -116,6 +147,22 @@ export default function ObstacleLayer({
     hitPlayedRef.current = false;
   }, [runId]);
 
+  function pickImagePreferLoaded(images) {
+    if (!Array.isArray(images) || images.length === 0) return null;
+
+    const broken = brokenRef.current;
+    const loaded = loadedRef.current;
+
+    // 1) сначала пытаемся выбрать уже загруженную и не битую
+    const ready = images.filter((src) => src && !broken.has(src) && loaded.has(src));
+    if (ready.length) return ready[randInt(0, ready.length - 1)];
+
+    // 2) иначе — любую не битую (может догрузиться)
+    const ok = images.filter((src) => src && !broken.has(src));
+    if (ok.length) return ok[randInt(0, ok.length - 1)];
+
+    return null;
+  }
 
   function spawnAtYWorld(yWorld) {
     const rawTypeId = pickWeighted(OBSTACLES_CONFIG.TYPE_WEIGHTS);
@@ -135,7 +182,8 @@ export default function ObstacleLayer({
           yWorld,
           minGapPx: OBSTACLES_CONFIG.SAME_LANE_MIN_GAP_PX,
         })
-      ) continue;
+      )
+        continue;
 
       if (
         !laneHasEnoughActionSwitchGap({
@@ -145,7 +193,8 @@ export default function ObstacleLayer({
           type,
           actionSwitchMinGapPx: OBSTACLES_CONFIG.ACTION_SWITCH_MIN_GAP_PX,
         })
-      ) continue;
+      )
+        continue;
 
       if (
         type.rule === "avoidLane" &&
@@ -156,9 +205,11 @@ export default function ObstacleLayer({
           getFish,
           rangePx: 420,
         })
-      ) continue;
+      )
+        continue;
 
-      const img = type.images[randInt(0, type.images.length - 1)];
+      const img = pickImagePreferLoaded(type.images);
+      if (!img) return;
 
       obstaclesRef.current.push({
         id: makeId(),
@@ -180,8 +231,6 @@ export default function ObstacleLayer({
     if (status !== "running") return;
 
     lastTimeRef.current = 0;
-
-    const TIP_FAIL_WINDOW_MS = 45;
 
     const step = ({ dt, speed, worldOffsetPx }) => {
       const dy = (speed ?? 0) * (dt ?? 0);
@@ -216,7 +265,7 @@ export default function ObstacleLayer({
       const playerHitY = fieldH - PLAYER_RENDER.GROUND_BOTTOM_PX - 10;
       const WARN_PX = 240;
 
-
+      const loaded = loadedRef.current;
 
       for (const o of obstaclesRef.current) {
         if (o.passed) continue;
@@ -225,16 +274,16 @@ export default function ObstacleLayer({
 
         const hitWindow =
           o.needAction === "jump"
-            ? (OBSTACLES_CONFIG.JUMP_HIT_WINDOW_PX ?? OBSTACLES_CONFIG.HIT_WINDOW_PX)
+            ? OBSTACLES_CONFIG.JUMP_HIT_WINDOW_PX ?? OBSTACLES_CONFIG.HIT_WINDOW_PX
             : OBSTACLES_CONFIG.HIT_WINDOW_PX;
 
-        // ✅ Если препятствие уже далеко позади — считаем пройденным
+        // Если препятствие уже далеко позади — считаем пройденным
         if (screenY - playerHitY > hitWindow) {
           o.passed = true;
           continue;
         }
 
-        // ✅ Luna warning — без изменений
+        // Luna warning — без изменений
         if (
           selectedCatId === "luna" &&
           o.lane === laneIndex &&
@@ -245,8 +294,7 @@ export default function ObstacleLayer({
             const distAheadWarn = playerHitY - screenY;
             if (distAheadWarn > 0 && distAheadWarn < WARN_PX) {
               const isRealDanger =
-                (o.rule === "needAction" && actionState !== o.needAction) ||
-                (o.rule === "avoidLane");
+                (o.rule === "needAction" && actionState !== o.needAction) || o.rule === "avoidLane";
               if (isRealDanger) dispatch(triggerLunaSense({ now }));
             }
           }
@@ -256,9 +304,26 @@ export default function ObstacleLayer({
         if (Math.abs(screenY - playerHitY) < hitWindow) {
           const sameLane = o.lane === laneIndex;
 
+          // 🔒 Нельзя убивать "невидимым" препятствием: сначала ждём, пока спрайт реально загружен.
+          const visualReady = !!o.img && loaded.has(o.img);
+
           // -------- avoidLane (sidestep) --------
           if (o.rule === "avoidLane") {
             if (sameLane) {
+              // Если спрайт ещё не готов — пропускаем коллизию в этот тик (иначе "невидимая смерть").
+              if (!visualReady) {
+                if (import.meta?.env?.DEV) {
+                  // eslint-disable-next-line no-console
+                  console.warn("[Obstacle] collision skipped: sprite not ready", {
+                    typeId: o.typeId,
+                    lane: o.lane,
+                    screenY,
+                    img: o.img,
+                  });
+                }
+                continue;
+              }
+
               o.passed = true;
               if (!hitPlayedRef.current) {
                 audioManager.playSfx("hit");
@@ -268,14 +333,27 @@ export default function ObstacleLayer({
               continue;
             }
 
-            // игрок ушёл в другую lane — пометим passed когда препятствие дошло до уровня игрока/ниже
             if (screenY >= playerHitY) o.passed = true;
             continue;
           }
 
           // -------- needAction (jump/slide) --------
           if (o.rule === "needAction" && sameLane) {
-            // не то действие -> смерть
+            // Если спрайт ещё не готов — не убиваем (иначе ощущается как "врезалась в пустоту").
+            if (!visualReady) {
+              if (import.meta?.env?.DEV) {
+                // eslint-disable-next-line no-console
+                console.warn("[Obstacle] collision skipped: sprite not ready", {
+                  typeId: o.typeId,
+                  needAction: o.needAction,
+                  lane: o.lane,
+                  screenY,
+                  img: o.img,
+                });
+              }
+              continue;
+            }
+
             if (actionState !== o.needAction) {
               o.passed = true;
               if (!hitPlayedRef.current) {
@@ -286,10 +364,8 @@ export default function ObstacleLayer({
               continue;
             }
 
-            // правильное действие:
             if (o.needAction === "jump") {
-              // "кончик" — только при приземлении и только если препятствие ещё чуть впереди
-              const distAhead = playerHitY - screenY; // >=0 впереди
+              const distAhead = playerHitY - screenY;
               const TIP_TIP_BAND_PX = 10;
 
               if (justLanded && distAhead >= 0 && distAhead <= TIP_TIP_BAND_PX) {
@@ -302,26 +378,15 @@ export default function ObstacleLayer({
                 continue;
               }
 
-              // ✅ Ключевая штука: если мы в прыжке и препятствие дошло до уровня ног/ниже —
-              // значит прыжок УЖЕ успешен. Ставим passed и НЕ даём умереть на выходе из jump.
-              if (screenY >= playerHitY) {
-                o.passed = true;
-              }
-
+              if (screenY >= playerHitY) o.passed = true;
               continue;
             }
 
-            // slide: правильный слайд — можно сразу считать пройденным в окне
             o.passed = true;
             continue;
           }
-
-          // needAction но в другой lane — не трогаем (пройдёт само по "позади")
         }
       }
-
-
-
 
       if (removed || spawned) bumpRender((x) => x + 1);
     };
@@ -341,21 +406,18 @@ export default function ObstacleLayer({
       last = t;
 
       const speed = scrollSpeedRef?.current ?? 0;
-      const dy = speed * dt;
-
-      if (!(typeof worldOffsetRef?.current === "number")) {
-        localOffsetRef.current += dy;
-      }
+      localOffsetRef.current += speed * dt;
 
       step({ dt, speed, worldOffsetPx: getOffsetRenderPx() });
+
       raf = requestAnimationFrame(frame);
     };
 
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
   }, [
-    status,
     fieldH,
+    laneCenters,
     laneIndex,
     actionState,
     actionUntilMs,

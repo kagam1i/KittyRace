@@ -21,7 +21,8 @@ export default function FishLayer({
   fieldH,
   scrollSpeedRef,
   worldOffsetRef,
-  getObstacles, // должен вернуть массив obstacle snapshot (y = screenY)
+  subscribeWorld,
+  getObstacles, // должен вернуть obstacle snapshot (y = screenY)
   setFishSnapshotGetter,
 }) {
   const dispatch = useDispatch();
@@ -33,8 +34,6 @@ export default function FishLayer({
   const localOffsetRef = useRef(0);
 
   const fishRef = useRef([]);
-  const lastTimeRef = useRef(0);
-
   const nextSpawnPxRef = useRef(
     randInt(FISH_CONFIG.SPAWN_GAP_PX.min, FISH_CONFIG.SPAWN_GAP_PX.max)
   );
@@ -43,7 +42,6 @@ export default function FishLayer({
 
   useEffect(() => {
     fishRef.current = [];
-    lastTimeRef.current = 0;
     localOffsetRef.current = 0;
 
     nextSpawnPxRef.current = randInt(
@@ -67,7 +65,7 @@ export default function FishLayer({
   useEffect(() => {
     if (!setFishSnapshotGetter) return;
 
-    // ✅ наружу отдаём screenY, чтобы ObstacleLayer мог корректно проверять конфликты
+    // Наружу отдаём screenY, чтобы ObstacleLayer мог проверять конфликты корректно.
     setFishSnapshotGetter(() => {
       return () => {
         const offset = getOffsetRenderPx();
@@ -97,7 +95,7 @@ export default function FishLayer({
     return clamp(s, 0.85, FISH_CONFIG.SCALE);
   }, [laneW]);
 
-  // gap для sidestep-блокировки (как “воздух”)
+  // gap для sidestep-блокировки
   const screenType = useMemo(() => {
     const bp = FISH_CONFIG.SCREEN_BREAKPOINTS_PX ?? { mobileMax: 479, tabletMax: 899 };
     if (fieldW <= bp.mobileMax) return "mobile";
@@ -180,34 +178,31 @@ export default function FishLayer({
 
   function prewarm() {
     const offsetFloat = getOffsetFloat();
+    const now = performance.now();
+
     for (let i = 0; i < 5; i++) {
       const screenY = -60 - i * 120;
-      spawnFish(screenY - offsetFloat, performance.now());
+      spawnFish(screenY - offsetFloat, now);
     }
+
     nextSpawnPxRef.current = randInt(80, 140);
   }
 
   useEffect(() => {
     if (status !== "running") return;
 
-    lastTimeRef.current = 0;
     if (!fishRef.current.length) prewarm();
 
-    let raf = 0;
+    const step = ({ t, dt, speed, worldOffsetPx }) => {
+      const dy = (speed ?? 0) * (dt ?? 0);
 
-    function frame(t) {
-      if (!lastTimeRef.current) lastTimeRef.current = t;
-      const dt = (t - lastTimeRef.current) / 1000;
-      lastTimeRef.current = t;
-
-      const speed = scrollSpeedRef?.current ?? 0;
-      const dy = speed * dt;
-
+      // Если общий worldOffset не используется — ведём локальный.
       if (typeof worldOffsetRef?.current !== "number") {
         localOffsetRef.current += dy;
       }
 
-      const offsetFloat = getOffsetFloat();
+      const offsetFloat =
+        typeof worldOffsetPx === "number" ? worldOffsetPx : getOffsetFloat();
       const offsetPx = Math.round(offsetFloat);
 
       if (hostRef.current) {
@@ -216,7 +211,7 @@ export default function FishLayer({
 
       let mutated = false;
 
-      // ✅ мягкая страховка, пока рыбы ещё не в кадре
+      // Мягкая страховка, пока рыбы ещё не в кадре
       if (
         cullInvisibleConflicts({
           fishList: fishRef.current,
@@ -232,7 +227,8 @@ export default function FishLayer({
       for (const f of fishRef.current) {
         if (f.hidden || f.picked) continue;
 
-        const screenY = f.y + offsetFloat;
+        // ✅ хитбокс синхронизирован с отрисовкой (offsetPx)
+        const screenY = f.y + offsetPx;
 
         if (
           Math.abs(screenY - pickupY) < FISH_CONFIG.PICKUP_WINDOW_PX &&
@@ -270,13 +266,28 @@ export default function FishLayer({
       }
 
       if (mutated) bumpRender((x) => x + 1);
+    };
 
-      raf = requestAnimationFrame(frame);
+    if (typeof subscribeWorld === "function") {
+      const unsubscribe = subscribeWorld((snap) => step(snap));
+      return unsubscribe;
     }
 
-    raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
-  }, [status, laneIndex, fieldH, laneW, fishScale, laneCenters, FISH_SIDESTEP_GAP_PX]);
+    return undefined;
+  }, [
+    status,
+    laneIndex,
+    fieldH,
+    laneW,
+    fishScale,
+    laneCenters,
+    FISH_SIDESTEP_GAP_PX,
+    subscribeWorld,
+    dispatch,
+    scrollSpeedRef,
+    worldOffsetRef,
+    getObstacles,
+  ]);
 
   return (
     <div
