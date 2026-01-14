@@ -15,15 +15,25 @@ export function SoundGate({ children }) {
     audioManager.setEnabled(soundEnabled);
   }, [soundEnabled]);
 
-  // Start/stop menu music based on screen
+  // Background music:
+  // - Menu: normal volume
+  // - Game: same track, but quieter + looped
+  // - Game over: stop
   useEffect(() => {
     if (!soundEnabled) return;
 
     if (gameStatus === "menu") {
-      audioManager.playMenuMusic();
-    } else {
-      audioManager.stopMenuMusic();
+      audioManager.playMenuMusic({ volume: 0.07 });
+      return;
     }
+
+    if (gameStatus === "running" || gameStatus === "paused") {
+      audioManager.playGameMusic({ volume: 0.07 });
+      return;
+    }
+
+    // gameover (и любые прочие экраны вне забега) — музыка не играет
+    audioManager.stopGameMusic();
   }, [gameStatus, soundEnabled]);
 
   // One-time unlock on first user gesture (for autoplay policy)

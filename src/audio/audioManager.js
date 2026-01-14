@@ -67,7 +67,6 @@ class AudioManager {
   initOnce() {
     if (this._inited) return;
 
-    // Keep volumes soft / unobtrusive
     this._sfx = {
       uiHover: makePool(uiHoverUrl, { volume: 0.35 }),
       uiClick: makePool(uiClickUrl, { volume: 0.45 }),
@@ -85,7 +84,6 @@ class AudioManager {
     this._menuMusic = music;
 
     this._applyMuteState();
-
     this._inited = true;
   }
 
@@ -99,7 +97,6 @@ class AudioManager {
     }
   }
 
-  // Called after the first user gesture to satisfy autoplay policy.
   unlock() {
     this.initOnce();
     this._unlocked = true;
@@ -130,17 +127,44 @@ class AudioManager {
     sfx.play(this._enabled);
   }
 
-  playMenuMusic() {
+  // Menu + gameplay use the same track; we only change volume by context.
+  playMenuMusic({ volume = 0.25 } = {}) {
     this.initOnce();
     if (!this._enabled) return;
     if (!this._unlocked) return;
 
     const a = this._menuMusic;
     if (!a) return;
+
+    if (typeof volume === "number") a.volume = volume;
+    a.loop = true;
+
     if (!a.paused) return;
 
     const p = a.play?.();
     if (p && typeof p.catch === "function") p.catch(() => {});
+  }
+
+  // Same track as menu, but quieter so SFX are clearly heard.
+  playGameMusic({ volume = 0.18 } = {}) {
+    this.initOnce();
+    if (!this._enabled) return;
+    if (!this._unlocked) return;
+
+    const a = this._menuMusic;
+    if (!a) return;
+
+    if (typeof volume === "number") a.volume = volume;
+    a.loop = true;
+
+    if (!a.paused) return;
+
+    const p = a.play?.();
+    if (p && typeof p.catch === "function") p.catch(() => {});
+  }
+
+  stopGameMusic() {
+    this.stopMenuMusic();
   }
 
   stopMenuMusic() {
