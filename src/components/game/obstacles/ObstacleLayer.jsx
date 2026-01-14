@@ -255,7 +255,6 @@ export default function ObstacleLayer({
         hostSlideRef.current.style.transform = `translate3d(0px, ${offset}px, 0px)`;
       }
 
-
       const beforeLen = obstaclesRef.current.length;
       obstaclesRef.current = obstaclesRef.current.filter((o) => o.y + offset < fieldH + 60);
       const removed = obstaclesRef.current.length !== beforeLen;
@@ -303,6 +302,20 @@ export default function ObstacleLayer({
         // если препятствие уже прошло кота (позади), в этом тике НЕ убиваем.
         const distAhead = playerHitY - screenY; // >0 значит препятствие впереди
         if (distAhead < 0) {
+          // ⚠️ Очень узкий случай: кот ещё в прыжке, а препятствие уже "чуть-чуть" прошло игрока.
+          // Если в этот момент пометить препятствие как passed, то кот может закончить прыжок
+          // прямо на "кончике" и геймовер не сработает.
+          // Поэтому держим препятствие активным в небольшой полосе (TIP_TIP_BAND_PX),
+          // пока прыжок не закончился.
+          const isJumpHoverBand =
+            actionState === "jump" &&
+            o.rule === "needAction" &&
+            o.needAction === "jump" &&
+            o.lane === laneIndex &&
+            distAhead >= -TIP_TIP_BAND_PX;
+
+          if (isJumpHoverBand) continue;
+
           const isJumpTipCase =
             justLanded &&
             o.rule === "needAction" &&
@@ -365,9 +378,7 @@ export default function ObstacleLayer({
 
               o.passed = true;
 
-              const didGameOver = dispatch(
-                tryGameOver({ obstacleTypeId: o.typeId })
-              );
+              const didGameOver = dispatch(tryGameOver({ obstacleTypeId: o.typeId }));
 
               if (didGameOver && !hitPlayedRef.current) {
                 audioManager.playSfx("hit");
@@ -401,9 +412,7 @@ export default function ObstacleLayer({
             if (actionState !== o.needAction) {
               o.passed = true;
 
-              const didGameOver = dispatch(
-                tryGameOver({ obstacleTypeId: o.typeId })
-              );
+              const didGameOver = dispatch(tryGameOver({ obstacleTypeId: o.typeId }));
 
               if (didGameOver && !hitPlayedRef.current) {
                 audioManager.playSfx("hit");
@@ -420,9 +429,7 @@ export default function ObstacleLayer({
               if (justLanded && distAhead >= -TIP_TIP_BAND_PX && distAhead <= TIP_TIP_BAND_PX) {
                 o.passed = true;
 
-                const didGameOver = dispatch(
-                  tryGameOver({ obstacleTypeId: o.typeId })
-                );
+                const didGameOver = dispatch(tryGameOver({ obstacleTypeId: o.typeId }));
 
                 if (didGameOver && !hitPlayedRef.current) {
                   audioManager.playSfx("hit");
@@ -528,5 +535,4 @@ export default function ObstacleLayer({
       </div>
     </>
   );
-
 }
