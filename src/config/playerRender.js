@@ -9,7 +9,7 @@ export const PLAYER_RENDER = {
   // Прыжок (ВСЕ НАСТРОЙКИ ТУТ)
   // ----------------------------
   // Высота прыжка (px) — примерно “1/5 экрана” при field ~ 450–550px это 80–110px
-  JUMP_HEIGHT_PX: 90,
+  JUMP_HEIGHT_PX: 70,
 
   // Длительность прыжка (ms) — это же значение используется в controls (сколько держим actionState="jump")
   JUMP_DURATION_MS: 750,

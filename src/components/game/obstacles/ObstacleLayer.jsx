@@ -153,24 +153,22 @@ export default function ObstacleLayer({
     const broken = brokenRef.current;
     const loaded = loadedRef.current;
 
-    // 1) сначала пытаемся выбрать уже загруженную и не битую
+    // Важно для фикса «резкого появления»:
+    // спавним препятствия только со спрайтом, который уже реально загружен.
+    // Иначе браузер может дорисовать <img> слишком поздно, и игрок видит
+    // "вылезло из воздуха" прямо перед котом.
     const ready = images.filter((src) => src && !broken.has(src) && loaded.has(src));
-    if (ready.length) return ready[randInt(0, ready.length - 1)];
-
-    // 2) иначе — любую не битую (может догрузиться)
-    const ok = images.filter((src) => src && !broken.has(src));
-    if (ok.length) return ok[randInt(0, ok.length - 1)];
-
-    return null;
+    if (!ready.length) return null;
+    return ready[randInt(0, ready.length - 1)];
   }
 
   function spawnAtYWorld(yWorld) {
     const rawTypeId = pickWeighted(OBSTACLES_CONFIG.TYPE_WEIGHTS);
-    if (!rawTypeId) return;
+    if (!rawTypeId) return false;
 
     const typeId = normalizeTypeId(rawTypeId);
     const type = OBSTACLE_TYPES[rawTypeId] ?? OBSTACLE_TYPES[typeId];
-    if (!type) return;
+    if (!type) return false;
 
     for (let i = 0; i < 16; i++) {
       const lane = randInt(0, 4);
@@ -209,7 +207,8 @@ export default function ObstacleLayer({
         continue;
 
       const img = pickImagePreferLoaded(type.images);
-      if (!img) return;
+      // Если спрайт ещё не готов — не спавним сейчас (иначе появится "из воздуха").
+      if (!img) return false;
 
       obstaclesRef.current.push({
         id: makeId(),
@@ -221,10 +220,16 @@ export default function ObstacleLayer({
         needAction: type.needAction,
         typeId,
         passed: false,
+
+        // ✅ фикс "невидимого" геймовера при фризах/скачках offset:
+        // пока препятствие не было видно хотя бы 1 кадр — коллизии запрещены.
+        seen: false,
       });
 
-      return;
+      return true;
     }
+
+    return false;
   }
 
   useEffect(() => {
@@ -252,14 +257,15 @@ export default function ObstacleLayer({
 
       if (nextSpawnPxRef.current <= 0) {
         const yWorld = -40 - offset;
-        spawnAtYWorld(yWorld);
+        const didSpawn = spawnAtYWorld(yWorld);
 
-        nextSpawnPxRef.current = randInt(
-          OBSTACLES_CONFIG.SPAWN_GAP_PX.min,
-          OBSTACLES_CONFIG.SPAWN_GAP_PX.max
-        );
+        // Если спрайты ещё догружаются — не делаем большой разрыв,
+        // а пробуем снова через небольшой промежуток.
+        nextSpawnPxRef.current = didSpawn
+          ? randInt(OBSTACLES_CONFIG.SPAWN_GAP_PX.min, OBSTACLES_CONFIG.SPAWN_GAP_PX.max)
+          : 20;
 
-        spawned = true;
+        spawned = didSpawn;
       }
 
       const playerHitY = fieldH - PLAYER_RENDER.GROUND_BOTTOM_PX - 10;
@@ -272,10 +278,25 @@ export default function ObstacleLayer({
 
         const screenY = o.y + offset;
 
+        // ✅ Арминг: препятствие должно быть видно хотя бы 1 кадр.
+        // Это убирает "смерть от невидимого препятствия" при фризах/скачках.
+        if (!o.seen) {
+          if (screenY > -20) o.seen = true;
+          continue;
+        }
+
         const hitWindow =
           o.needAction === "jump"
             ? OBSTACLES_CONFIG.JUMP_HIT_WINDOW_PX ?? OBSTACLES_CONFIG.HIT_WINDOW_PX
             : OBSTACLES_CONFIG.HIT_WINDOW_PX;
+
+        // ✅ Фикс "невидимого" game over при фризах/скачках:
+        // если препятствие уже прошло кота (позади), в этом тике НЕ убиваем.
+        const distAhead = playerHitY - screenY; // >0 значит препятствие впереди
+        if (distAhead < 0) {
+          o.passed = true;
+          continue;
+        }
 
         // Если препятствие уже далеко позади — считаем пройденным
         if (screenY - playerHitY > hitWindow) {
@@ -301,7 +322,7 @@ export default function ObstacleLayer({
         }
 
         // Дальше работаем только если препятствие рядом с игроком
-        if (Math.abs(screenY - playerHitY) < hitWindow) {
+        if (distAhead < hitWindow) {
           const sameLane = o.lane === laneIndex;
 
           // 🔒 Нельзя убивать "невидимым" препятствием: сначала ждём, пока спрайт реально загружен.
