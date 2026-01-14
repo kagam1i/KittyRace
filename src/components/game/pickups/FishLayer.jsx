@@ -112,7 +112,11 @@ export default function FishLayer({
   }, [fieldW]);
 
   const FISH_SIDESTEP_GAP_PX = useMemo(() => {
-    const map = FISH_CONFIG.SIDESTEP_GAP_PX_BY_SCREEN ?? { desktop: 6, tablet: 5, mobile: 4 };
+    const map = FISH_CONFIG.SIDESTEP_GAP_PX_BY_SCREEN ?? {
+      desktop: 6,
+      tablet: 5,
+      mobile: 4,
+    };
     return map[screenType] ?? map.desktop ?? 6;
   }, [screenType]);
 
@@ -129,23 +133,68 @@ export default function FishLayer({
 
   const SIDESTEP_LANE_RADIUS = 1;
 
+  function fishOverlapsSolidObstacleBounds({ lane, fishScreenY }) {
+    if (typeof getObstacles !== "function") return false;
+
+    const obstacles = getObstacles();
+    if (!Array.isArray(obstacles) || obstacles.length === 0) return false;
+
+    const fishSizePx = FISH_CONFIG.SIZE_PX * fishScale;
+    const fishHalf = fishSizePx / 2;
+
+    const fishTop = fishScreenY - fishHalf;
+    const fishBottom = fishScreenY + fishHalf;
+
+    // небольшой паддинг для стабильности пиксель-арта
+    const PAD_PX = 2;
+
+    for (const o of obstacles) {
+      if (!o) continue;
+      if (o.lane !== lane) continue;
+      if (typeof o.y !== "number") continue;
+
+      // slide НЕ блокируем: для него есть underSlide
+      if (o.typeId === "slide") continue;
+
+      const b = getObstacleBoundsPx({ typeId: o.typeId, laneW, yPx: o.y });
+
+      const top = Math.round(b.top) - PAD_PX;
+      const bottom = Math.round(b.bottom) + PAD_PX;
+
+      if (fishBottom > top && fishTop < bottom) return true;
+    }
+
+    return false;
+  }
+
   function isBlocked(lane, fishScreenY) {
     const fishSizePx = FISH_CONFIG.SIZE_PX * fishScale;
 
-    return fishBlockedBySidestep({
-      fishLane: lane,
-      fishScreenY,
-      getObstacles,
-      laneW,
-      fishSizePx,
-      sidestepLaneRadius: SIDESTEP_LANE_RADIUS,
-      sidestepGapPx: FISH_SIDESTEP_GAP_PX,
-    });
+    if (
+      fishBlockedBySidestep({
+        fishLane: lane,
+        fishScreenY,
+        getObstacles,
+        laneW,
+        fishSizePx,
+        sidestepLaneRadius: SIDESTEP_LANE_RADIUS,
+        sidestepGapPx: FISH_SIDESTEP_GAP_PX,
+      })
+    ) {
+      return true;
+    }
+
+    // не спавним рыбу внутри “твёрдых” препятствий (камни/jump и т.п.)
+    if (fishOverlapsSolidObstacleBounds({ lane, fishScreenY })) {
+      return true;
+    }
+
+    return false;
   }
 
-  // ✅ ВАЖНО: underSlide считаем в момент спавна (в screen координатах),
+  // underSlide считаем в момент спавна (screen координаты),
   // чтобы рыба сразу попадала в нужный слой и НЕ "перескакивала" кадром позже.
-  function computeUnderSlideAtSpawn({ lane, yWorld, offsetFloat }) {
+  function computeUnderSlideAtSpawn({ lane, yWorld, offsetPx }) {
     if (typeof getObstacles !== "function") return false;
     const obstacles = getObstacles();
     if (!Array.isArray(obstacles) || obstacles.length === 0) return false;
@@ -153,7 +202,7 @@ export default function FishLayer({
     const fishSizePx = FISH_CONFIG.SIZE_PX * fishScale;
     const fishHalf = fishSizePx / 2;
 
-    const fishScreenY = yWorld + offsetFloat;
+    const fishScreenY = yWorld + offsetPx;
     const fishTop = fishScreenY - fishHalf;
     const fishBottom = fishScreenY + fishHalf;
 
@@ -178,13 +227,14 @@ export default function FishLayer({
 
   function spawnFish(yWorld, nowMs) {
     const offsetFloat = getOffsetFloat();
+    const offsetPx = Math.round(offsetFloat);
 
     const fishSizePx = FISH_CONFIG.SIZE_PX * fishScale;
     const minLaneGapPx = FISH_CONFIG.MIN_LANE_GAP_PX ?? 52;
 
     for (let i = 0; i < 24; i++) {
       const lane = randInt(0, 4);
-      const fishScreenY = yWorld + offsetFloat;
+      const fishScreenY = yWorld + offsetPx;
 
       if (isBlocked(lane, fishScreenY)) continue;
 
@@ -202,7 +252,7 @@ export default function FishLayer({
         continue;
       }
 
-      const underSlide = computeUnderSlideAtSpawn({ lane, yWorld, offsetFloat });
+      const underSlide = computeUnderSlideAtSpawn({ lane, yWorld, offsetPx });
 
       fishRef.current.push({
         id: makeId(),
@@ -330,9 +380,9 @@ export default function FishLayer({
     getObstacles,
   ]);
 
-  // ✅ во время slide кот уходит на zIndex=4, поэтому рыбу тоже опускаем ниже, чтобы не лежала "на коте"
-  const fishZUnder = actionState === "slide" ? 3 : 5;
-  const fishZOver = actionState === "slide" ? 3 : 7;
+  // оставляем рыбу выше препятствий даже во время slide
+  const fishZUnder = 5;
+  const fishZOver = 7;
 
   return (
     <>
