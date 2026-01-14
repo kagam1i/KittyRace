@@ -61,6 +61,8 @@ export default function ObstacleLayer({
   const lunaCooldownUntil = useSelector((s) => s.game.lunaSenseCooldownUntil ?? 0);
 
   const hostRef = useRef(null);
+  const hostSlideRef = useRef(null); // ✅ слой только для slide
+
   const localOffsetRef = useRef(0);
 
   const obstaclesRef = useRef([]);
@@ -143,6 +145,8 @@ export default function ObstacleLayer({
     nextSpawnPxRef.current = randInt(firstMin, firstMax);
 
     if (hostRef.current) hostRef.current.style.transform = "translate3d(0px, 0px, 0px)";
+    if (hostSlideRef.current) hostSlideRef.current.style.transform = "translate3d(0px, 0px, 0px)";
+
     bumpRender((x) => x + 1);
     hitPlayedRef.current = false;
   }, [runId]);
@@ -247,6 +251,10 @@ export default function ObstacleLayer({
       if (hostRef.current) {
         hostRef.current.style.transform = `translate3d(0px, ${offset}px, 0px)`;
       }
+      if (hostSlideRef.current) {
+        hostSlideRef.current.style.transform = `translate3d(0px, ${offset}px, 0px)`;
+      }
+
 
       const beforeLen = obstaclesRef.current.length;
       obstaclesRef.current = obstaclesRef.current.filter((o) => o.y + offset < fieldH + 60);
@@ -476,23 +484,49 @@ export default function ObstacleLayer({
   ]);
 
   return (
-    <div
-      ref={hostRef}
-      className="absolute inset-0 pointer-events-none"
-      style={{ zIndex: 6, willChange: "transform" }}
-    >
-      {obstaclesRef.current.map((o) => (
-        <ObstacleSprite
-          key={o.id}
-          src={o.src}
-          x={o.x}
-          y={o.y}
-          sizePx={o.sizePx ?? OBSTACLES_CONFIG.BASE_SIZE_PX}
-          scale={o.scale ?? OBSTACLES_CONFIG.SCALE}
-          typeId={o.typeId}
-        />
+    <>
+      {/* обычные препятствия — ниже кота */}
+      <div
+        ref={hostRef}
+        className="absolute inset-0 pointer-events-none"
+        style={{ zIndex: 6, willChange: "transform" }}
+      >
+        {obstaclesRef.current
+          .filter((o) => o?.typeId !== "slide")
+          .map((o) => (
+            <ObstacleSprite
+              key={o.id}
+              src={o.img}
+              x={o.x}
+              y={o.y}
+              sizePx={OBSTACLES_CONFIG.BASE_SIZE_PX}
+              scale={maxScale}
+              typeId={o.typeId}
+            />
+          ))}
+      </div>
 
-      ))}
-    </div>
+      {/* slide — отдельный слой ВЫШЕ кота */}
+      <div
+        ref={hostSlideRef}
+        className="absolute inset-0 pointer-events-none"
+        style={{ zIndex: 9, willChange: "transform" }}
+      >
+        {obstaclesRef.current
+          .filter((o) => o?.typeId === "slide")
+          .map((o) => (
+            <ObstacleSprite
+              key={o.id}
+              src={o.img}
+              x={o.x}
+              y={o.y}
+              sizePx={OBSTACLES_CONFIG.BASE_SIZE_PX}
+              scale={maxScale}
+              typeId={o.typeId}
+            />
+          ))}
+      </div>
+    </>
   );
+
 }
