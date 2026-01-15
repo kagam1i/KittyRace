@@ -5,11 +5,9 @@ import fishIcon from "../../../assets/environment/fish.png";
 export default function GameHud({ onMenuClick }) {
   const fishCount = useSelector((s) => s.game.fishCount);
 
-  // всплывающий текст (штраф от Bruno)
   const hudFloatText = useSelector((s) => s.game.hudFloatText);
   const hudFloatSeq = useSelector((s) => s.game.hudFloatSeq);
 
-  // локально “перезапускаем” анимацию через key
   const [floatKey, setFloatKey] = useState(0);
   const [showFloat, setShowFloat] = useState(false);
   const [floatText, setFloatText] = useState("");
@@ -21,7 +19,7 @@ export default function GameHud({ onMenuClick }) {
     setFloatKey(hudFloatSeq);
     setShowFloat(true);
 
-    const t = setTimeout(() => setShowFloat(false), 900); // длительность должна совпадать с CSS
+    const t = setTimeout(() => setShowFloat(false), 900); 
     return () => clearTimeout(t);
   }, [hudFloatSeq, hudFloatText]);
 

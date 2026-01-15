@@ -6,20 +6,12 @@ import fishIcon from "../../assets/environment/fish.png";
 
 import { audioManager } from "../../audio/audioManager";
 
-/**
- * GameOverMenu
- * - “табличка” (ui-board)
- * - restart / main menu
- * - показываем собранных рыб
- *
- * Облака должны быть ВНУТРИ таблички (а не на весь экран).
- */
+
 export function GameOverMenu() {
   const dispatch = useDispatch();
 
 
   const lastRunFish = useSelector((s) => s.game.lastRunFish ?? 0);
-
 
 
   return (

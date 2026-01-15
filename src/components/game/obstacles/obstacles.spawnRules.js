@@ -1,17 +1,9 @@
-// src/components/game/obstacles/obstacles.spawnRules.js
-//
-// Только правила спавна (чистая логика), без React.
-// Все зависимости прокидываются аргументами.
-
 export function getFishListSafe(getFish) {
   const list = typeof getFish === "function" ? getFish() : [];
   return Array.isArray(list) ? list : [];
 }
 
-/**
- * Проверка конфликта с рыбой для avoidLane (sidestep):
- * Возвращает true, если в этой же lane есть рыба "рядом" по Y.
- */
+
 export function fishConflict({
   lane,
   yWorld,

@@ -3,20 +3,9 @@ import { useEffect, useRef } from "react";
 import roadTileImg from "../../assets/environment/road_tile.png";
 import { ROAD_TILE_SOURCE_PX } from "../../config/trackRoad";
 
-/**
- * TrackRoad:
- * - рисует тайл дороги
- * - повторяет его по вертикали
- * - двигает background-position, создавая бесконечный скролл
- *
- * Важно:
- * - если передан worldOffsetRef, дорога использует его.
- * - offset округляется до целых пикселей, чтобы не было дрожания pixel-art.
- */
 export function TrackRoad({ fieldPx, status, scrollSpeedRef, worldOffsetRef, subscribeWorld }) {
   const layerRef = useRef(null);
 
-  // fallback, если worldOffsetRef не передали
   const localOffsetRef = useRef(0);
 
   const tileHeightPx = Math.round(
@@ -28,7 +17,6 @@ export function TrackRoad({ fieldPx, status, scrollSpeedRef, worldOffsetRef, sub
     if (!el) return;
     if (status !== "running") return;
 
-    // Если не передали subscribeWorld — fallback на старое поведение (локальный rAF)
     if (typeof subscribeWorld !== "function") {
       let raf = 0;
       let last = performance.now();

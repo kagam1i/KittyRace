@@ -9,9 +9,8 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
   const frameW = CAT_SHEET.FRAME_W;
   const frameH = CAT_SHEET.FRAME_H;
 
-  const baseScale = CAT_SHEET.SCALE_OPTIONS[0]; // 2x (десктоп — как было)
+  const baseScale = CAT_SHEET.SCALE_OPTIONS[0];
 
-  // Визуальный scale для планшета/телефона (1:1, только уменьшение). Десктоп НЕ трогаем.
   const [renderScale, setRenderScale] = useState(() => {
     if (typeof window === "undefined") return 1;
     const w = window.innerWidth;
@@ -40,9 +39,7 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
   const [sheetSize, setSheetSize] = useState({ w: 0, h: 0 });
   const [localFrame, setLocalFrame] = useState(0);
 
-  // =========================
-  // Bruno “second chance” FX (НЕ ТРОГАЕМ)
-  // =========================
+
   const brunoFxSeq = useSelector((s) => s.game.brunoSecondChanceFxSeq);
   const [blink, setBlink] = useState(false);
 
@@ -53,18 +50,15 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
 
     const t = setTimeout(() => {
       setBlink(false);
-    }, 2200); // Длительность анимации в CSS
+    }, 2200); 
 
     return () => clearTimeout(t);
   }, [brunoFxSeq]);
 
-  // =========================
-  // Luna: event-based pulse + cooldown indicator
-  // =========================
+
   const lunaFxSeq = useSelector((s) => s.game.lunaSenseFxSeq);
   const lunaCooldownUntil = useSelector((s) => s.game.lunaSenseCooldownUntil ?? 0);
 
-  // Чтобы cooldown визуально обновлялся сам
   const [nowTs, setNowTs] = useState(() => Date.now());
   useEffect(() => {
     if (catId !== "luna") return;
@@ -81,7 +75,6 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
   }, []);
 
   useEffect(() => {
-    // ✅ jump кадры берём из фазы, а не из интервала
     if (actionState === "jump") return;
 
     setLocalFrame(0);
@@ -101,14 +94,12 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
 
   if (sheetSize.w === 0 || sheetSize.h === 0) return null;
 
-  // --- выбор кадра ---
   let sheetFrameIndex = anim.start + localFrame;
 
-  // ✅ jump: 4/5/6 по фазам полёта
   if (actionState === "jump") {
     if (jumpPhase === "apex") sheetFrameIndex = 5;
     else if (jumpPhase === "down") sheetFrameIndex = 6;
-    else sheetFrameIndex = 4; // "up" или null
+    else sheetFrameIndex = 4; 
   }
 
   const frameX = sheetFrameIndex * frameW;
@@ -134,7 +125,7 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
         overflow: "visible",
       }}
     >
-      {/* Luna: перезапуск single-pulse через remount wrapper (key=lunaFxSeq) */}
+      {/* Luna */}
       {catId === "luna" && (
         <span
           key={lunaFxSeq}
@@ -142,7 +133,6 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
           style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
           aria-hidden="true"
         >
-          {/* ✅ НЕПРИКОСНОВЕННЫЙ БЛОК (как ты зафиксировала) */}
           <div
             className="luna-warn-dot luna-blink"
             aria-hidden="true"

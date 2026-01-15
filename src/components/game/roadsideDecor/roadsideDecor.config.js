@@ -1,64 +1,28 @@
-// ---------------------------------------------------------
-// Конфигурация генерации декораций на обочинах.
-// Здесь настраивается ПЛОТНОСТЬ, РАЗНООБРАЗИЕ и КОМПОЗИЦИЯ.
-// JSX не содержит магических чисел — всё вынесено сюда.
-// ---------------------------------------------------------
-
-/* =========================================================
-   🎛 PRESETS ПЛОТНОСТИ
-   ========================================================= */
-
-const PRESET_A = {
-  // Cozy: заполнено, но с воздухом
-  GAP_BASE_Y_PX: 135,
-  GAP_JITTER_Y_PX: 30,
-  SMALL_SPAWN_CHANCE: 0.48,
-  GRASS_CLUMP_CHANCE: 0.22,
-};
-
-const PRESET_B = {
-  // Более плотная, "обжитая" обочина
-  GAP_BASE_Y_PX: 120,
-  GAP_JITTER_Y_PX: 26,
-  SMALL_SPAWN_CHANCE: 0.52,
-  GRASS_CLUMP_CHANCE: 0.26,
-};
-
 const PRESET_C = {
-  // Плотно (но не каша): меньше пустоты на поле
   GAP_BASE_Y_PX: 98,
   GAP_JITTER_Y_PX: 22,
   SMALL_SPAWN_CHANCE: 0.66,
   GRASS_CLUMP_CHANCE: 0.32,
 };
 
-// активный пресет (меняй ТОЛЬКО эту строку)
 const ACTIVE_PRESET = PRESET_C;
 
-/* =========================================================
-   ОСНОВНАЯ КОНФИГУРАЦИЯ
-   ========================================================= */
 
 export const ROADSIDE_DECOR = {
-  // Масштаб ассетов (целые значения для pixel-art)
   SCALE: 2,
 
-  // --- плотность и шаг по Y
   GAP_BASE_Y_PX: ACTIVE_PRESET.GAP_BASE_Y_PX,
   GAP_JITTER_Y_PX: ACTIVE_PRESET.GAP_JITTER_Y_PX,
   SMALL_SPAWN_CHANCE: ACTIVE_PRESET.SMALL_SPAWN_CHANCE,
 
-  // Доп. запас за экраном перед удалением
   DESPAWN_PADDING_PX: 140,
 
-  // --- пучки травы (иногда 2 травинки рядом)
   GRASS_CLUMP: {
     CHANCE: ACTIVE_PRESET.GRASS_CLUMP_CHANCE,
     X_OFFSET_PERCENT: 8,
     Y_OFFSET_PX: 10,
   },
 
-  // --- безопасные диапазоны X (% ширины обочины)
   X_BY_TYPE_PERCENT: {
     small: {
       left: { min: 25, max: 75 },
@@ -70,14 +34,11 @@ export const ROADSIDE_DECOR = {
     },
   },
 
-  // --- правила деревьев
   TREE_RULES: {
-    // чуть чаще деревья, но не "частокол"
     MIN_SPACING_PX: 320,
     CHANCE: 0.9,
   },
 
-  // --- ассеты (фактические размеры + слой)
   TYPES: {
     grass: {
       src: new URL("../../../assets/environment/decor/grass.png", import.meta.url)
@@ -158,7 +119,6 @@ export const ROADSIDE_DECOR = {
     },
   },
 
-  // --- равные шансы между всеми "мелкими" типами
   SMALL_WEIGHTS: [
     { type: "grass", weight: 1 },
     { type: "bush", weight: 1 },

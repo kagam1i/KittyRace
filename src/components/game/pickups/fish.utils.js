@@ -1,7 +1,3 @@
-// src/components/game/pickups/fish.utils.js
-//
-// Чистые утилиты без React.
-
 export function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }

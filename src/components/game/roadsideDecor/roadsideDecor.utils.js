@@ -1,8 +1,3 @@
-// src/components/game/roadsideDecor/roadsideDecor.utils.js
-//
-// Только "чистые" утилиты: выбор типа, spacing, clamp/rand, makeItem.
-// Никакого React, никаких refs — чтобы поведение было стабильным и тестируемым.
-
 export function makeId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
@@ -65,10 +60,7 @@ export function canSpawnTreeAtY(ROADSIDE_DECOR, lastTreeY, y) {
   return lastTreeY - y >= ROADSIDE_DECOR.TREE_RULES.MIN_SPACING_PX;
 }
 
-/**
- * Возвращает { type, group, nextLastTreeY }
- * (lastTreeY обновляем только если реально выбрали дерево)
- */
+
 export function pickTypeForSpawnY(ROADSIDE_DECOR, y, lastTreeY) {
   const cat = pickCategory();
 

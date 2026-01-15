@@ -24,7 +24,7 @@ export default function FishLayer({
   scrollSpeedRef,
   worldOffsetRef,
   subscribeWorld,
-  getObstacles, // obstacle snapshot: { typeId, lane, y(screenPx), ... }
+  getObstacles, 
   setFishSnapshotGetter,
 }) {
   const dispatch = useDispatch();
@@ -33,7 +33,6 @@ export default function FishLayer({
   const runId = useSelector((s) => s.game.runId);
   const actionState = useSelector((s) => s.game.actionState);
 
-  // 2 слоя, чтобы можно было рисовать рыбу "под slide"
   const hostUnderRef = useRef(null);
   const hostOverRef = useRef(null);
 
@@ -81,7 +80,7 @@ export default function FishLayer({
         return fishRef.current.map((f) => ({
           id: f.id,
           lane: f.lane,
-          y: f.y + offset, // screenY
+          y: f.y + offset,
           picked: f.picked,
           hidden: f.hidden,
         }));
@@ -89,7 +88,6 @@ export default function FishLayer({
     });
 
     return () => setFishSnapshotGetter(() => []);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setFishSnapshotGetter]);
 
   const laneW = useMemo(() => fieldW / 5, [fieldW]);
@@ -145,7 +143,6 @@ export default function FishLayer({
     const fishTop = fishScreenY - fishHalf;
     const fishBottom = fishScreenY + fishHalf;
 
-    // небольшой паддинг для стабильности пиксель-арта
     const PAD_PX = 2;
 
     for (const o of obstacles) {
@@ -153,7 +150,6 @@ export default function FishLayer({
       if (o.lane !== lane) continue;
       if (typeof o.y !== "number") continue;
 
-      // slide НЕ блокируем: для него есть underSlide
       if (o.typeId === "slide") continue;
 
       const b = getObstacleBoundsPx({ typeId: o.typeId, laneW, yPx: o.y });
@@ -184,7 +180,6 @@ export default function FishLayer({
       return true;
     }
 
-    // не спавним рыбу внутри “твёрдых” препятствий (камни/jump и т.п.)
     if (fishOverlapsSolidObstacleBounds({ lane, fishScreenY })) {
       return true;
     }
@@ -192,8 +187,6 @@ export default function FishLayer({
     return false;
   }
 
-  // underSlide считаем в момент спавна (screen координаты),
-  // чтобы рыба сразу попадала в нужный слой и НЕ "перескакивала" кадром позже.
   function computeUnderSlideAtSpawn({ lane, yWorld, offsetPx }) {
     if (typeof getObstacles !== "function") return false;
     const obstacles = getObstacles();
@@ -206,7 +199,6 @@ export default function FishLayer({
     const fishTop = fishScreenY - fishHalf;
     const fishBottom = fishScreenY + fishHalf;
 
-    // чуть расширим bounds, чтобы пиксель-арт выглядел стабильно
     const SLIDE_PAD_PX = 2;
 
     for (const o of obstacles) {
@@ -380,7 +372,6 @@ export default function FishLayer({
     getObstacles,
   ]);
 
-  // оставляем рыбу выше препятствий даже во время slide
   const fishZUnder = 5;
   const fishZOver = 7;
 

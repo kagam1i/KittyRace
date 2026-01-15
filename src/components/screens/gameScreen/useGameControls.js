@@ -96,7 +96,6 @@ export function useGameControls(targetRef) {
     };
   }, [dispatch]);
 
-  // Touch / Pointer controls (swipe)
   useEffect(() => {
     const el = targetRef?.current;
     if (!el) return;

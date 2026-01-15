@@ -1,16 +1,3 @@
-// audioManager.js
-// Centralized SFX/music controller.
-//
-// Rules:
-// - No Audio created inside React render.
-// - One-time initialization.
-// - Small pools for SFX (quick repeats without creating new Audio elements).
-//
-// Notes:
-// - Menu music is looped.
-// - Autoplay restrictions mean music can start only after a user gesture.
-//   SoundGate handles the first-gesture unlock.
-
 import uiHoverUrl from "../assets/sound/sfx/ui_hover.wav";
 import uiClickUrl from "../assets/sound/sfx/ui_click.wav";
 import jumpUrl from "../assets/sound/sfx/jump.wav";
@@ -42,7 +29,6 @@ function makePool(src, { volume = 0.6 } = {}) {
       try {
         a.currentTime = 0;
       } catch (_) {
-        // ignore if not seekable yet
       }
 
       const p = a.play?.();
@@ -63,14 +49,12 @@ class AudioManager {
     this._sfx = null;
     this._menuMusic = null;
 
-    // WebAudio for instant UI feedback (reduces click/hover latency)
     this._uiCtx = null;
     this._uiBuffers = { uiClick: null, uiHover: null };
     this._uiGain = null;
   }
 
   async _initUiWebAudio() {
-    // Only needed for UI sounds; keep everything else on <audio> pools.
     if (this._uiCtx || typeof window === "undefined") return;
 
     const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -93,7 +77,6 @@ class AudioManager {
       return await this._uiCtx.decodeAudioData(buf);
     };
 
-    // Pre-decode to avoid the first-click delay.
     try {
       const [clickBuf, hoverBuf] = await Promise.all([
         decode(uiClickUrl),
@@ -102,7 +85,6 @@ class AudioManager {
       this._uiBuffers.uiClick = clickBuf;
       this._uiBuffers.uiHover = hoverBuf;
     } catch (_) {
-      // If decoding fails, we'll silently fall back to the <audio> pools.
     }
   }
 
@@ -158,9 +140,6 @@ class AudioManager {
   unlock() {
     this.initOnce();
     this._unlocked = true;
-
-    // After the first user gesture we can safely create/resume AudioContext
-    // and pre-decode UI sounds to remove perceived latency.
     void this._initUiWebAudio().then(async () => {
       try {
         if (this._uiCtx?.state === "suspended") {
@@ -192,7 +171,6 @@ class AudioManager {
     this.initOnce();
     if (!this._enabled) return;
 
-    // UI sounds via WebAudio for immediate response; fallback to pool.
     if (name === "uiClick" || name === "uiHover") {
       const played = this._playUiWebAudio(name);
       if (played) return;
@@ -203,7 +181,6 @@ class AudioManager {
     sfx.play(true);
   }
 
-  // Menu + gameplay use the same track; we only change volume by context.
   playMenuMusic({ volume = 0.25 } = {}) {
     this.initOnce();
     if (!this._enabled) return;
@@ -221,7 +198,6 @@ class AudioManager {
     if (p && typeof p.catch === "function") p.catch(() => {});
   }
 
-  // Same track as menu, but quieter so SFX are clearly heard.
   playGameMusic({ volume = 0.18 } = {}) {
     this.initOnce();
     if (!this._enabled) return;

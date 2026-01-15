@@ -1,6 +1,4 @@
-// --------------------------------------------------------
 // Генерация декораций на обочине
-// --------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ROADSIDE_DECOR } from "./roadsideDecor.config";
@@ -32,7 +30,6 @@ export default function RoadsideDecorLayer({
   const itemsRef = useRef([]);
   const [, bumpRender] = useState(0);
 
-  // float offset (для логики), transform — по целым px
   const scrollOffsetRef = useRef(0);
 
   useEffect(() => {
@@ -150,7 +147,6 @@ export default function RoadsideDecorLayer({
       return unsubscribe;
     }
 
-    // fallback: старое поведение (локальный rAF)
     let raf = 0;
     let last = performance.now();
 

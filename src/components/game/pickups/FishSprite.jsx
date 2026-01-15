@@ -1,10 +1,3 @@
-/**
- * FishSprite
- * - позиционирование (x / y)
- * - масштаб
- * - pop при подборе (длительность задаётся снаружи)
- * - fade-out при culled
- */
 export default function FishSprite({
   src,
   x,

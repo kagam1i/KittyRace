@@ -16,26 +16,21 @@ export default function PlayerActor({
   actionState,
   selectedCatId,
   fieldW,
-  // ✅ по-настоящему единый rAF: PlayerActor тоже тикает от мира
   subscribeWorld,
 }) {
-  // ✅ во время slide кот рисуется ниже препятствий
 const zIndex = actionState === "slide" ? 8 : 8;
 
   const wrapperRef = useRef(null);
 
-  // refs for smooth lane move
   const laneIndexRef = useRef(laneIndex);
   const fieldWRef = useRef(fieldW || 0);
   const renderXRef = useRef(0);
   const rafRef = useRef(0);
   const lastTsRef = useRef(0);
 
-  // jump tracking
   const prevActionRef = useRef(actionState);
   const jumpStartMsRef = useRef(0);
 
-  // чтобы CatSprite реально перерисовывался по фазам jump (4/5/6)
   const [jumpPhase, setJumpPhase] = useState(null);
 
   useEffect(() => {
@@ -47,13 +42,11 @@ const zIndex = actionState === "slide" ? 8 : 8;
   }, [fieldW]);
 
   useEffect(() => {
-    // старт прыжка (один раз)
     if (prevActionRef.current !== "jump" && actionState === "jump") {
       jumpStartMsRef.current = performance.now();
       setJumpPhase("up");
     }
 
-    // выход из прыжка
     if (prevActionRef.current === "jump" && actionState !== "jump") {
       setJumpPhase(null);
     }
@@ -61,7 +54,6 @@ const zIndex = actionState === "slide" ? 8 : 8;
     prevActionRef.current = actionState;
   }, [actionState]);
 
-  // ✅ чтобы НЕ было “телепорта”: выставляем left сразу при маунте/изменении fieldW
   useLayoutEffect(() => {
     const el = wrapperRef.current;
     if (!el) return;
@@ -91,7 +83,6 @@ const zIndex = actionState === "slide" ? 8 : 8;
 
       lastTsRef.current = ts;
 
-      // --- smooth X ---
       if (w > 0) {
         const targetX = laneCenterPx(laneIndexRef.current, w);
         const x = renderXRef.current;
@@ -104,7 +95,6 @@ const zIndex = actionState === "slide" ? 8 : 8;
         el.style.left = `${Math.round(next)}px`;
       }
 
-      // --- smooth Y (jump only) ---
       const ground = PLAYER_RENDER.GROUND_BOTTOM_PX;
 
       if (actionState === "jump") {
@@ -117,21 +107,17 @@ const zIndex = actionState === "slide" ? 8 : 8;
         const y = jumpCurve01(tNorm) * PLAYER_MOTION.JUMP_HEIGHT_PX;
         el.style.bottom = `${Math.round(ground + y)}px`;
 
-        // фазы под кадры 4/5/6
         let phase = "up";
         if (tNorm < 0.45) phase = "up";
         else if (tNorm < 0.55) phase = "apex";
         else phase = "down";
 
-        // обновляем редко (только если реально поменялось)
         setJumpPhase((prev) => (prev === phase ? prev : phase));
       } else {
-        // run/slide остаются на земле (слайд не ломаем)
         el.style.bottom = `${ground}px`;
       }
     };
 
-    // ✅ Основной путь: тик от единого rAF мира
     if (typeof subscribeWorld === "function") {
       const unsubscribe = subscribeWorld(({ ts, dt }) => {
         step(ts, dt);
@@ -139,7 +125,6 @@ const zIndex = actionState === "slide" ? 8 : 8;
       return unsubscribe;
     }
 
-    // fallback (если subscribeWorld не передали)
     let mounted = true;
     const tick = (ts) => {
       if (!mounted) return;

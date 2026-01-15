@@ -1,4 +1,3 @@
-// src/components/screens/gameScreen/useWorldSnapshot.js
 //
 // Единый источник правды для worldOffset:
 // - worldOffsetRef.current  -> float (логика)
@@ -8,17 +7,10 @@
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
-/**
- * Единый rAF для мира.
- *
- * - worldOffsetRef.current    -> float (логика)
- * - worldOffsetPxRef.current  -> int   (pixel-perfect рендер)
- * - subscribe(fn) позволяет слоям подписаться на каждый тик,
- *   не создавая свои rAF (слои становятся "тупыми").
- */
+
 export function useWorldSnapshot(status, runId, scrollSpeedRef, onTick) {
-  const worldOffsetRef = useRef(0); // float
-  const worldOffsetPxRef = useRef(0); // int (rounded)
+  const worldOffsetRef = useRef(0); 
+  const worldOffsetPxRef = useRef(0); 
 
   const listenersRef = useRef(new Set());
 
@@ -40,12 +32,10 @@ export function useWorldSnapshot(status, runId, scrollSpeedRef, onTick) {
     let last = performance.now();
 
     const tick = (ts) => {
-      // dt clamp: защищает от огромного шага после возврата вкладки.
       const rawDt = (ts - last) / 1000;
       const dt = Math.max(0, Math.min(0.05, rawDt));
       last = ts;
 
-      // обновление скорости (ускорение мира) — в том же rAF
       if (typeof onTick === "function") onTick(dt);
 
       const speed = scrollSpeedRef?.current ?? 0;

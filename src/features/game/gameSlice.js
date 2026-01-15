@@ -4,7 +4,7 @@ const initialState = {
   status: "menu",
   laneIndex: 2,
   actionState: "run",
-  actionUntilMs: 0, // ✅ добавлено
+  actionUntilMs: 0,
   selectedCatId: "milo",
 
   fishCount: 0,
@@ -33,26 +33,20 @@ const gameSlice = createSlice({
   initialState,
   reducers: {
     startGame: (state) => {
-      // Новый забег
       state.status = "running";
 
-      // Сброс персонажа в стартовое состояние
       state.laneIndex = 2;
       state.actionState = "run";
 
-      // Сброс счётчика рыб за забег
       state.fishCount = 0;
       state.lastRunFish = 0;
 
-      // Сброс FX
       state.hudFloatText = "";
       state.hudFloatSeq = 0;
 
-      // Сброс Bruno perk
       state.brunoSecondChanceUsed = false;
       state.brunoSecondChanceFxSeq = 0;
 
-      // Сброс Luna perk
       state.lunaSenseFxSeq = 0;
       state.lunaSenseCooldownUntil = 0;
 
@@ -72,15 +66,12 @@ const gameSlice = createSlice({
     },
 
     gameOver(state) {
-      // защита от повторных вызовов
       if (state.status === "gameover") return;
 
       state.status = "gameover";
 
-      // сохраняем результат для GameOver
       state.lastRunFish = state.fishCount;
 
-      // переносим рыбы забега в банк
       if (state.fishCount > 0) {
         state.walletFish += state.fishCount;
         state.fishCount = 0;
@@ -115,17 +106,14 @@ const gameSlice = createSlice({
     },
 
     addFish(state, action) {
-      // Добавление рыбок ВО ВРЕМЯ ЗАБЕГА
       const amount = action.payload ?? 1;
       state.fishCount += amount;
     },
 
-    // ================== DEV / ТЕСТ ==================
     addWalletFish(state, action) {
       const amount = action.payload ?? 0;
       state.walletFish = Math.max(0, state.walletFish + amount);
     },
-    // ================================================
 
     buyCat(state, action) {
       const { catId, cost } = action.payload || {};
@@ -145,32 +133,27 @@ const gameSlice = createSlice({
     },
 
     applyPersist(state, action) {
-      // восстановление сохранённых данных (если у тебя уже есть persist)
       const p = action.payload || {};
       if (typeof p.walletFish === "number") state.walletFish = p.walletFish;
       if (Array.isArray(p.unlockedCats)) state.unlockedCats = p.unlockedCats;
       if (typeof p.selectedCatId === "string") state.selectedCatId = p.selectedCatId;
     },
 
-    // Bruno: помечаем, что прощение потрачено + триггерим FX у кота
     markBrunoSecondChanceUsed(state) {
       state.brunoSecondChanceUsed = true;
       state.brunoSecondChanceFxSeq += 1;
     },
 
-    // Штраф за ошибку Bruno: -N рыб в текущем забеге + всплывашка над HUD
     applyRunFishPenalty(state, action) {
       const amount = action.payload?.amount ?? 0;
-      if (amount <= 0) return; // ✅ если 0 — ничего не делаем, значит не будет "-0"
+      if (amount <= 0) return; 
 
       state.fishCount = Math.max(0, state.fishCount - amount);
 
-      // ✅ всплывающий текст над HUD: "-N"
       state.hudFloatText = `-${amount}`;
       state.hudFloatSeq += 1;
     },
 
-    // Luna: single-pulse + cooldown gate
     triggerLunaSense(state, action) {
       const now = action?.payload?.now ?? Date.now();
       const COOLDOWN_MS = 2500;
@@ -204,9 +187,6 @@ export const {
   triggerLunaSense,
 } = gameSlice.actions;
 
-// Bruno: 1 раз за забег прощает ошибку (jump/slide/sidestep)
-// и отнимает 20% от уже собранных рыб (fishCount).
-// ✅ Если штраф получился 0 — всплывашку не показываем.
 export const tryGameOver = ({ obstacleTypeId }) => (dispatch, getState) => {
   const s = getState().game;
 

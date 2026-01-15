@@ -1,8 +1,3 @@
-// src/components/game/pickups/fish.spawnRules.js
-//
-// Правила спавна/конфликтов рыб.
-// Никакого React. Все зависимости прокидываются аргументами.
-
 import { getObstacleBoundsPx } from "../obstacles/obstacleBounds";
 
 export function getObstaclesSafe(getObstacles) {
@@ -10,10 +5,7 @@ export function getObstaclesSafe(getObstacles) {
   return Array.isArray(raw) ? raw : [];
 }
 
-/**
- * Рыба блокируется препятствием sidestep, если пересекается по Y (с зазором).
- * ВАЖНО: obstacles snapshot должен отдавать y = screenY.
- */
+
 export function fishBlockedBySidestep({
   fishLane,
   fishScreenY,
@@ -34,7 +26,7 @@ export function fishBlockedBySidestep({
     const obsLane = o.lane ?? 0;
     if (Math.abs(fishLane - obsLane) > sidestepLaneRadius) continue;
 
-    const sY = o.y; // screenY
+    const sY = o.y; 
     if (typeof sY !== "number") continue;
 
     const b = getObstacleBoundsPx({
@@ -52,14 +44,12 @@ export function fishBlockedBySidestep({
   return false;
 }
 
-/**
- * Мягкая страховка: если рыба ещё выше экрана и конфликтует с sidestep — прячем.
- */
+
 export function cullInvisibleConflicts({
   fishList,
   offsetFloat,
   topVisibleScreenY,
-  isBlockedFn, // (lane, screenY) => boolean
+  isBlockedFn, 
 }) {
   let changed = false;
 
@@ -68,7 +58,7 @@ export function cullInvisibleConflicts({
 
     const fishScreenY = f.y + offsetFloat;
 
-    if (fishScreenY > topVisibleScreenY) continue; // в кадре/почти в кадре — не трогаем
+    if (fishScreenY > topVisibleScreenY) continue; 
     if (!isBlockedFn(f.lane, fishScreenY)) continue;
 
     f.hidden = true;
@@ -78,10 +68,6 @@ export function cullInvisibleConflicts({
   return changed;
 }
 
-/**
- * Проверка: нет ли слишком близкой рыбы в той же lane (в world-Y).
- * Учитываем размер рыбы и "видимость" во время pop-анимации.
- */
 export function hasTooCloseFishSameLane({
   fishList,
   lane,

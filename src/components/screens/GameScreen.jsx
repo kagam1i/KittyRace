@@ -28,10 +28,8 @@ export function GameScreen() {
   const status = useSelector((s) => s.game.status);
   const runId = useSelector((s) => s.game.runId);
 
-  // Единая скорость мира (px/sec)
   const { scrollSpeedRef, updateSpeed } = useWorldScrollSpeed(status, runId);
 
-  // ✅ Единый snapshot мира (float + rounded px) + единый rAF
   const { worldOffsetRef, subscribe } = useWorldSnapshot(
     status,
     runId,

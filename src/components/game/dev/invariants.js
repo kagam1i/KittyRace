@@ -2,9 +2,6 @@ function nowMs() {
   return typeof performance !== "undefined" ? performance.now() : Date.now();
 }
 
-/**
- * Ограничитель для DEV-логов: чтобы не спамило каждый кадр.
- */
 export function makeDevLimiter({ minIntervalMs = 700, maxCount = 25 } = {}) {
   let last = 0;
   let count = 0;
@@ -22,9 +19,6 @@ export function makeDevLimiter({ minIntervalMs = 700, maxCount = 25 } = {}) {
   };
 }
 
-/**
- * Инвариант: picked-рыба не должна жить дольше popDurationMs (+ небольшой допуск).
- */
 export function assertPickedLifetime({ fish, nowMs: t, slackMs = 34, report }) {
   if (!import.meta.env.DEV) return;
   if (!fish?.picked) return;

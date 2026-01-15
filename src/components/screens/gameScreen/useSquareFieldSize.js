@@ -14,7 +14,6 @@ export function useSquareFieldSize() {
       setFieldPx(Math.floor(rect.width));
     }
 
-    // Инициализация + ресайз
     updateFieldSize();
     window.addEventListener("resize", updateFieldSize);
     return () => window.removeEventListener("resize", updateFieldSize);

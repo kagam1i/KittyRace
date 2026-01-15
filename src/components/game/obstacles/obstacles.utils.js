@@ -1,8 +1,3 @@
-// src/components/game/obstacles/obstacles.utils.js
-//
-// Чистые утилиты без React.
-// Важно: normalizeTypeId сохраняет контракт с FishLayer: "sidestep" строго как "sidestep".
-
 export function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }

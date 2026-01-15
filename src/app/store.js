@@ -4,7 +4,6 @@ import settingsReducer from "../features/settings/settingsSlice";
 
 const PERSIST_KEY = "kittyrace_persist_v1";
 
-// Загружаем только то, что нужно сохранить между сессиями
 function loadPersistedGame() {
   try {
     const raw = localStorage.getItem(PERSIST_KEY);
@@ -37,13 +36,11 @@ export const store = configureStore({
   },
 });
 
-// ✅ Мягкая гидратация после создания store (не ломает initialState)
 const persistedGame = loadPersistedGame();
 if (persistedGame) {
   store.dispatch(applyPersist(persistedGame));
 }
 
-// Persist (throttled)
 let saveTimer = null;
 
 store.subscribe(() => {
@@ -65,7 +62,6 @@ store.subscribe(() => {
 
       localStorage.setItem(PERSIST_KEY, JSON.stringify(payload));
     } catch {
-      // молча игнорируем (quota exceeded и т.д.)
     }
   }, 200);
 });

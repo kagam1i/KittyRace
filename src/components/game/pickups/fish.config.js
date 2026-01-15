@@ -9,8 +9,6 @@ export const FISH_CONFIG = {
 
   SPAWN_GAP_PX: { min: 160, max: 260 },
 
-  // ✅ новый параметр: минимальный зазор между рыбами в одной полосе (world px)
-  // (чтобы не было “склеек” и “впритык”)
   MIN_LANE_GAP_PX: 52,
 
   PICKUP_WINDOW_PX: 14,

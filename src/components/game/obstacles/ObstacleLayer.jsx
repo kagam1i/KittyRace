@@ -16,7 +16,6 @@ import {
 
 import { randInt, pickWeighted, makeId, normalizeTypeId } from "./obstacles.utils";
 
-// Прогрев + учёт статуса загрузки спрайтов, чтобы не было "невидимых" препятствий.
 function preloadObstacleImages({ allSrc, preloaded, loaded, broken }) {
   for (const src of allSrc) {
     if (!src || preloaded.has(src)) continue;
@@ -31,7 +30,6 @@ function preloadObstacleImages({ allSrc, preloaded, loaded, broken }) {
 
     img.onerror = () => {
       broken.add(src);
-      // Важно: чтобы не зависнуть в "не загружено", считаем это тоже финальным статусом.
       loaded.add(src);
     };
 
@@ -45,7 +43,6 @@ export default function ObstacleLayer({
   runId,
   scrollSpeedRef,
   worldOffsetRef,
-  // ✅ единый rAF: слой не имеет своего requestAnimationFrame
   subscribeWorld,
   setObstacleSnapshotGetter,
   getFish,
@@ -56,12 +53,11 @@ export default function ObstacleLayer({
   const actionState = useSelector((s) => s.game.actionState);
   const actionUntilMs = useSelector((s) => s.game.actionUntilMs ?? 0);
 
-  // ✅ Luna only (cooldown gate живёт в gameSlice)
   const selectedCatId = useSelector((s) => s.game.selectedCatId);
   const lunaCooldownUntil = useSelector((s) => s.game.lunaSenseCooldownUntil ?? 0);
 
   const hostRef = useRef(null);
-  const hostSlideRef = useRef(null); // ✅ слой только для slide
+  const hostSlideRef = useRef(null); 
 
   const localOffsetRef = useRef(0);
 
@@ -75,7 +71,6 @@ export default function ObstacleLayer({
   const prevActionRef = useRef(actionState);
   const hitPlayedRef = useRef(false);
 
-  // Кэши загрузки спрайтов препятствий (фикс “невидимого” game over).
   const preloadedRef = useRef(new Set());
   const loadedRef = useRef(new Set());
   const brokenRef = useRef(new Set());
@@ -112,7 +107,7 @@ export default function ObstacleLayer({
         return obstaclesRef.current.map((o) => ({
           id: o.id,
           lane: o.lane,
-          y: o.y + offset, // screenY
+          y: o.y + offset,
           rule: o.rule,
           needAction: o.needAction,
           typeId: normalizeTypeId(o.typeId),
@@ -121,11 +116,9 @@ export default function ObstacleLayer({
     });
 
     return () => setObstacleSnapshotGetter(() => []);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setObstacleSnapshotGetter]);
 
   useEffect(() => {
-    // Прогреваем все спрайты препятствий в начале забега.
     const allSrc = Object.values(OBSTACLE_TYPES).flatMap((t) => t?.images ?? []);
     preloadObstacleImages({
       allSrc,
@@ -138,8 +131,6 @@ export default function ObstacleLayer({
     lastTimeRef.current = 0;
     localOffsetRef.current = 0;
 
-    // ✅ чтобы в начале забега трасса не была пустой:
-    // первый спавн делаем заметно быстрее, чем обычный gap.
     const firstMin = Math.max(20, Math.floor(OBSTACLES_CONFIG.SPAWN_GAP_PX.min * 0.25));
     const firstMax = Math.max(firstMin + 10, Math.floor(OBSTACLES_CONFIG.SPAWN_GAP_PX.min * 0.55));
     nextSpawnPxRef.current = randInt(firstMin, firstMax);
@@ -157,10 +148,6 @@ export default function ObstacleLayer({
     const broken = brokenRef.current;
     const loaded = loadedRef.current;
 
-    // Важно для фикса «резкого появления»:
-    // спавним препятствия только со спрайтом, который уже реально загружен.
-    // Иначе браузер может дорисовать <img> слишком поздно, и игрок видит
-    // "вылезло из воздуха" прямо перед котом.
     const ready = images.filter((src) => src && !broken.has(src) && loaded.has(src));
     if (!ready.length) return null;
     return ready[randInt(0, ready.length - 1)];
@@ -211,7 +198,6 @@ export default function ObstacleLayer({
         continue;
 
       const img = pickImagePreferLoaded(type.images);
-      // Если спрайт ещё не готов — не спавним сейчас (иначе появится "из воздуха").
       if (!img) return false;
 
       obstaclesRef.current.push({
@@ -224,9 +210,6 @@ export default function ObstacleLayer({
         needAction: type.needAction,
         typeId,
         passed: false,
-
-        // ✅ фикс "невидимого" геймовера при фризах/скачках offset:
-        // пока препятствие не было видно хотя бы 1 кадр — коллизии запрещены.
         seen: false,
       });
 
@@ -266,8 +249,6 @@ export default function ObstacleLayer({
         const yWorld = -40 - offset;
         const didSpawn = spawnAtYWorld(yWorld);
 
-        // Если спрайты ещё догружаются — не делаем большой разрыв,
-        // а пробуем снова через небольшой промежуток.
         nextSpawnPxRef.current = didSpawn
           ? randInt(OBSTACLES_CONFIG.SPAWN_GAP_PX.min, OBSTACLES_CONFIG.SPAWN_GAP_PX.max)
           : 20;
@@ -286,8 +267,7 @@ export default function ObstacleLayer({
 
         const screenY = o.y + offset;
 
-        // ✅ Арминг: препятствие должно быть видно хотя бы 1 кадр.
-        // Это убирает "смерть от невидимого препятствия" при фризах/скачках.
+
         if (!o.seen) {
           if (screenY > -20) o.seen = true;
           continue;
@@ -298,15 +278,9 @@ export default function ObstacleLayer({
             ? OBSTACLES_CONFIG.JUMP_HIT_WINDOW_PX ?? OBSTACLES_CONFIG.HIT_WINDOW_PX
             : OBSTACLES_CONFIG.HIT_WINDOW_PX;
 
-        // ✅ Фикс "невидимого" game over при фризах/скачках:
-        // если препятствие уже прошло кота (позади), в этом тике НЕ убиваем.
-        const distAhead = playerHitY - screenY; // >0 значит препятствие впереди
+
+        const distAhead = playerHitY - screenY; 
         if (distAhead < 0) {
-          // ⚠️ Очень узкий случай: кот ещё в прыжке, а препятствие уже "чуть-чуть" прошло игрока.
-          // Если в этот момент пометить препятствие как passed, то кот может закончить прыжок
-          // прямо на "кончике" и геймовер не сработает.
-          // Поэтому держим препятствие активным в небольшой полосе (TIP_TIP_BAND_PX),
-          // пока прыжок не закончился.
           const isJumpHoverBand =
             actionState === "jump" &&
             o.rule === "needAction" &&
@@ -329,13 +303,11 @@ export default function ObstacleLayer({
           }
         }
 
-        // Если препятствие уже далеко позади — считаем пройденным
         if (screenY - playerHitY > hitWindow) {
           o.passed = true;
           continue;
         }
 
-        // Luna warning — без изменений
         if (
           selectedCatId === "luna" &&
           o.lane === laneIndex &&
@@ -352,20 +324,15 @@ export default function ObstacleLayer({
           }
         }
 
-        // Дальше работаем только если препятствие рядом с игроком
         if (distAhead < hitWindow) {
           const sameLane = o.lane === laneIndex;
 
-          // 🔒 Нельзя убивать "невидимым" препятствием: сначала ждём, пока спрайт реально загружен.
           const visualReady = !!o.img && loaded.has(o.img);
 
-          // -------- avoidLane (sidestep) --------
           if (o.rule === "avoidLane") {
             if (sameLane) {
-              // Если спрайт ещё не готов — пропускаем коллизию в этот тик (иначе "невидимая смерть").
               if (!visualReady) {
                 if (import.meta?.env?.DEV) {
-                  // eslint-disable-next-line no-console
                   console.warn("[Obstacle] collision skipped: sprite not ready", {
                     typeId: o.typeId,
                     lane: o.lane,
@@ -392,12 +359,9 @@ export default function ObstacleLayer({
             continue;
           }
 
-          // -------- needAction (jump/slide) --------
           if (o.rule === "needAction" && sameLane) {
-            // Если спрайт ещё не готов — не убиваем (иначе ощущается как "врезалась в пустоту").
             if (!visualReady) {
               if (import.meta?.env?.DEV) {
-                // eslint-disable-next-line no-console
                 console.warn("[Obstacle] collision skipped: sprite not ready", {
                   typeId: o.typeId,
                   needAction: o.needAction,
@@ -452,13 +416,11 @@ export default function ObstacleLayer({
       if (removed || spawned) bumpRender((x) => x + 1);
     };
 
-    // ✅ Приоритет: единый rAF через subscribeWorld.
     if (typeof subscribeWorld === "function") {
       const unsubscribe = subscribeWorld((snap) => step(snap));
       return unsubscribe;
     }
 
-    // --- fallback: локальный rAF ---
     let raf = 0;
     let last = performance.now();
 

@@ -6,18 +6,15 @@ import { CATS } from "../../features/game/cats";
 
 import backgroundImg from "../../assets/background.png";
 
-// previews
 import miloPreview from "../../assets/sprites/preview/milo.png";
 import brunoPreview from "../../assets/sprites/preview/bruno.png";
 import lunaPreview from "../../assets/sprites/preview/luna.png";
 
-// sound
 import soundOnIcon from "../../assets/sound/sound_on.png";
 import soundOffIcon from "../../assets/sound/sound_off.png";
 
 import { audioManager } from "../../audio/audioManager";
 
-// fish
 import fishIcon from "../../assets/environment/fish.png";
 
 import CatCarouselCard from "./CatCarouselCard";
@@ -91,12 +88,10 @@ export function MainMenu() {
     const onKey = (e) => {
       if (!import.meta.env.DEV) return;
 
-      // +1000 рыб
       if (e.ctrlKey && e.shiftKey && e.code === "KeyF") {
         dispatch(addWalletFish(1000));
       }
 
-      // -1000 рыб
       if (e.ctrlKey && e.shiftKey && e.code === "KeyD") {
         dispatch(addWalletFish(-1000));
       }
@@ -106,10 +101,6 @@ export function MainMenu() {
     return () => window.removeEventListener("keydown", onKey);
   }, [dispatch]);
 
-
-
-
-  // ============================================================
 
   return (
     <div className="min-h-screen grid place-items-center p-6 bg-bg">
@@ -162,7 +153,7 @@ export function MainMenu() {
               />
               <span className="ui-icon-chip__count">{walletFish}</span>
 
-              {/* ✅ FX: улетающий текст из банка при покупке */}
+              {/* FX: улетающий текст из банка при покупке */}
               {walletFloatSeq > 0 && walletFloatText && (
                 <span
                   key={walletFloatSeq}

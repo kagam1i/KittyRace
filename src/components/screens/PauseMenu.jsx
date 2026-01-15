@@ -5,12 +5,7 @@ import backgroundImg from "../../assets/background.png";
 
 import { audioManager } from "../../audio/audioManager";
 
-/**
- * PauseMenu
- * - overlay поверх GameScreen
- * - “табличка” (ui-board)
- * - кнопки continue / main menu
- */
+
 export function PauseMenu() {
   const dispatch = useDispatch();
 

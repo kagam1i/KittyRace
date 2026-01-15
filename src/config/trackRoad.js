@@ -1,29 +1,17 @@
 // Скорость прокрутки трассы в пикселях в секунду
 export const ROAD_SCROLL_SPEED_PX_PER_SEC = 120;
 
-// ------------------------------------------------------------
-// Плавное ускорение мира
-// ------------------------------------------------------------
-// Как это работает:
-// - раз в N секунд увеличиваем текущую скорость на небольшой множитель
-// - есть верхний лимит, чтобы игра не стала нечитаемой
-//
-// Эти значения подобраны так, чтобы изменение ощущалось, но не "ломало" темп.
-// При необходимости их можно легко подкрутить.
-export const WORLD_SPEED_RAMP_INTERVAL_SEC = 25; // примерно 20–30 секунд
-export const WORLD_SPEED_RAMP_MULT = 1.01; // +1% к скорости за шаг
-export const WORLD_SCROLL_SPEED_MAX_PX_PER_SEC = 240; // жёсткий верхний лимит
+export const WORLD_SPEED_RAMP_INTERVAL_SEC = 25; 
+export const WORLD_SPEED_RAMP_MULT = 1.01;
+export const WORLD_SCROLL_SPEED_MAX_PX_PER_SEC = 240;
 
-// Исходный размер тайла дороги (road_tile.png)
 export const ROAD_TILE_SOURCE_PX = {
   width: 162,
   height: 32,
 };
 
-// Ширина боковых полос (в процентах от поля)
 export const SHOULDER_STRIP_PERCENT = 12;
 
-// Исходный размер тайлов обочин (left_road.png / right_road.png)
 export const SHOULDER_TILE_SOURCE_PX = {
   width: 51,
   height: 32,
