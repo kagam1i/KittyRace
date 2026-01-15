@@ -9,7 +9,28 @@ export default function CatSprite({ catId, actionState = "run", jumpPhase = null
   const frameW = CAT_SHEET.FRAME_W;
   const frameH = CAT_SHEET.FRAME_H;
 
-  const scale = CAT_SHEET.SCALE_OPTIONS[0]; // 2x
+  const baseScale = CAT_SHEET.SCALE_OPTIONS[0]; // 2x (десктоп — как было)
+
+  // Визуальный scale для планшета/телефона (1:1, только уменьшение). Десктоп НЕ трогаем.
+  const [renderScale, setRenderScale] = useState(() => {
+    if (typeof window === "undefined") return 1;
+    const w = window.innerWidth;
+    if (w <= 640) return 0.8;
+    if (w <= 1024) return 0.9;
+    return 1;
+  });
+
+  useEffect(() => {
+    function onResize() {
+      const w = window.innerWidth;
+      const next = w <= 640 ? 0.8 : w <= 1024 ? 0.9 : 1;
+      setRenderScale(next);
+    }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const scale = baseScale * renderScale;
   const rowIndex = CAT_ROW_BY_ID[catId] ?? 0;
 
   const anim = useMemo(() => {

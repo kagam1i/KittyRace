@@ -9,7 +9,7 @@ export default function ObstacleSprite({ src, x, y, sizePx, scale = 1, typeId })
         top: y,
         width: sizePx,
         height: sizePx,
-        transform: "translate(-50%, -50%)",
+        transform: "translate(-50%, -50%) scale(var(--obstacle-render-scale, 1))",
       }}
     >
       <div

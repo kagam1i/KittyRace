@@ -22,8 +22,8 @@ export default function DecorSprite({ type, xPercent, yPx, scale }) {
       style={{
         left: `${xPercent}%`,
         top: `${yPx}px`,
-        width: decor.w * usedScale,
-        height: decor.h * usedScale,
+        width: `calc(${decor.w * usedScale}px * var(--decor-render-scale, 1))`,
+        height: `calc(${decor.h * usedScale}px * var(--decor-render-scale, 1))`,
         transform: "translateX(-50%)",
         imageRendering: "pixelated",
         zIndex: decor.z,

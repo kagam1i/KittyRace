@@ -820,3 +820,32 @@
     color: rgba(47, 58, 46, 0.95);
   }
 }
+
+/* === Responsive render scales (tablet/mobile only) === */
+/* Десктоп: 1 (ничего не меняем). Планшет/телефон: только визуальное уменьшение (1:1). */
+:root{
+  --cat-render-scale: 1;
+  --obstacle-render-scale: 1;
+  --fish-render-scale: 1;
+  --decor-render-scale: 1;
+}
+
+/* Планшет */
+@media (max-width: 1024px){
+  :root{
+    --cat-render-scale: 0.9;
+    --obstacle-render-scale: 0.9;
+    --fish-render-scale: 0.9;
+    --decor-render-scale: 0.9;
+  }
+}
+
+/* Телефон */
+@media (max-width: 640px){
+  :root{
+    --cat-render-scale: 0.8;
+    --obstacle-render-scale: 0.8;
+    --fish-render-scale: 0.8;
+    --decor-render-scale: 0.8;
+  }
+}
