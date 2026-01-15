@@ -17,11 +17,9 @@ export const GameRoot = () => {
 
   let content;
 
-  // Меню — отдельный экран (как было)
   if (gameStatus === "menu") content = <MainMenu />;
   else if (gameStatus === "gameover") content = <GameOverMenu />;
   else {
-    // ✅ Во всех остальных состояниях держим GameScreen смонтированным
     content = (
       <div className="relative">
         <GameScreen />
